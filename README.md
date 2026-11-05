@@ -41,6 +41,24 @@ Die Schaltfläche **Ausschreibungen** kehrt jederzeit zur Liste zurück. Der But
 
 Die eingebauten Formulare behalten ihre bisherigen Funktionen. Sie werden nur in die passenden Schritte verschoben. Erfolgreiche Speicheraktionen führen weiterhin zum nächsten Schritt; jeder Bereich lässt sich jederzeit manuell öffnen. Es wird nichts automatisch veröffentlicht oder zugeteilt.
 
+## Zentrale Schülerdatenbank und Zugangskarten
+
+In der Administrator-Kopfzeile öffnet **Schülerdatenbank** eine unabhängige Verwaltung – auch bevor die erste Ausschreibung existiert.
+
+- Schüler suchen, nach Klasse und Status filtern, neu anlegen und bearbeiten (ID, Vorname, Nachname, Klasse).
+- Schüler aktivieren und deaktivieren; Deaktivierung bei bestehenden Anmeldungen ist in der Oberfläche gesperrt.
+- **Karte PDF** für einzelne Schüler, klassenweiser Druck über Klassenfilter oder alle aktiven Schüler.
+- A4-Layout mit acht abtrennbaren Karten pro Blatt oder einer grossen Karte pro Blatt.
+- Fehlende Codes erstellen, bestehende Codes unverändert übernehmen oder Codes nach ausdrücklicher zusätzlicher Bestätigung neu ausstellen.
+
+### Bestehende Codes nachdrucken
+
+Die früher erzeugten Codes sind nur als Hash gespeichert. Der Klartext ist daraus nicht wiederherstellbar. Mit der ursprünglichen Code-CSV (Spalten Schueler_ID und Zugangscode) können diese Codes unverändert in eine verschlüsselte Ablage in **Supabase Vault** übernommen werden. Erst danach ist der Nachdruck ohne Codewechsel möglich. Bei Verlust der alten CSV bleibt die ausdrücklich bestätigte Neuausgabe; dabei werden die alten Karten ungültig.
+
+Seit dieser Version werden neue Codes serverseitig generiert und zusätzlich verschlüsselt im Vault abgelegt. Nur die verifizierte Schulverwaltung darf sie über eine geschützte Datenbankfunktion für die PDF-Erstellung abrufen. Keine Codes in GitHub oder andere öffentliche Ablagen hochladen. Die PDFs entstehen lokal im Browser mit einer festgelegten jsPDF-Version; gedruckte Karten und PDF-Dateien vertraulich behandeln.
+
+Die Backend-Abläufe (Ausgabe, Wiederabruf, Übernahme und Wechsel) wurden mit Testtransaktionen und anschliessendem ROLLBACK geprüft. Die Bedienung und der PDF-Ausdruck im echten Browser sind noch praktisch zu testen.
+
 ## Aktuelle Funktionen
 
 - Administratoranmeldung über Supabase Auth, E-Mail-Bestätigung und schulinterne Freigabe
