@@ -2,6 +2,21 @@
 
 **Testversion** der Verwaltung von Lernmodulen für Schülerinnen und Schüler. Weboberfläche auf GitHub Pages; Daten, Zugriffsrechte und serverseitige Berechnung auf einem **eigenen Supabase-Projekt**. Andere Tools und Datenbanken bleiben getrennt.
 
+## Geführte Verwaltung (neues Bedienkonzept)
+
+Die Administration ist nun als **Akkordeon mit acht Schritten** aufgebaut:
+
+1. Ausschreibung anlegen
+2. Module und Zeitblöcke erfassen
+3. Schüler importieren
+4. Persönliche Zugangscodes erzeugen
+5. Teilnehmende einzeln oder nach Klasse auswählen
+6. Anmeldung freigeben
+7. Anmeldungen kontrollieren und bei Bedarf korrigieren
+8. Zuteilung und Resultate verwalten
+
+Nach einem erfolgreichen Schritt wird der nächste passende Abschnitt geöffnet, der vorherige eingeklappt. Bei den Modulen erfolgt dieser Wechsel erst, wenn mindestens so viele aktive Module vorhanden sind wie Wünsche verlangt werden. Jede Stufe lässt sich jederzeit über die Überschrift oder die Schaltflächen manuell öffnen, schliessen und erneut bearbeiten. Die Schaltfläche **Nächsten sinnvollen Schritt anzeigen** orientiert sich am Status der zuletzt erstellten Ausschreibung. Es werden keine Daten automatisch veröffentlicht oder zugeteilt: Dafür bleibt immer ein bewusster Admin-Klick erforderlich.
+
 ## Aktuelle Funktionen
 
 - Administratoranmeldung über Supabase Auth, E-Mail-Bestätigung und schulinterne Freigabe
