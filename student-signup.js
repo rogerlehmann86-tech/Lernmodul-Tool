@@ -40,5 +40,6 @@
     finally{button.disabled=false;}
   });
   get('reloadSignups').addEventListener('click',load);
+  window.loadLearningSignup=load;
   load();
 })();
