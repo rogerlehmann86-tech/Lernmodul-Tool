@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="de-CH"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lernmodule | OSZ Rapperswil</title>
+<style>
+:root{--ink:#26373b;--accent:#b74e3d;--muted:#677579;--paper:#f5f4f0;--line:#d9dfdd}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,-apple-system,sans-serif;background:var(--paper);color:var(--ink)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:22px max(20px,calc((100vw - 1050px)/2))}
+.brand{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:750;color:var(--accent)}h1{font-size:clamp(30px,5vw,46px);line-height:1.15;margin:8px 0}h2{font-size:24px;margin:0 0 12px}h3{margin:12px 0}
+main{max-width:1050px;margin:30px auto;padding:0 18px}.panel{background:white;border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:18px}
+label{display:block;font-weight:650;margin:10px 0}input,textarea,select{display:block;width:100%;padding:11px;margin-top:5px;border:1px solid #abb9b9;border-radius:6px;font:inherit}
+button{border:0;border-radius:6px;background:var(--accent);color:white;padding:11px 16px;cursor:pointer;font:inherit;font-weight:650;margin:5px 5px 5px 0}button.secondary{background:#344b4d}
+button:focus-visible,input:focus-visible{outline:3px solid #e5ad63;outline-offset:2px}.hidden{display:none}
+#notice{white-space:pre-wrap;margin:12px 0}small,.muted{color:var(--muted)}.modules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.module{border:1px solid var(--line);padding:14px;border-radius:8px;background:#fbfbf9}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line)}
+footer{max-width:1050px;margin:30px auto;padding:15px 18px;color:var(--muted);font-size:13px}
+</style></head>
+<body><header><div class="brand">Oberstufenzentrum Rapperswil</div><h1>Lernmodule</h1><div>Module entdecken · Wünsche planen · Schulverwaltung</div></header>
+<main><div id="notice" role="status" aria-live="polite"></div>
+<section class="panel"><h2>Aktuelle Ausschreibungen</h2><div id="catalog">Wird geladen …</div></section>
+<section id="auth" class="panel"><h2>Administration</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
+<label>E-Mail<input id="email" type="email" autocomplete="email" value="lia.lehmann@bluewin.ch"></label>
+<label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
+<button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button>
+<p><small>Die Erstregistrierung wird erst nach E-Mail-Bestätigung freigeschaltet.</small></p></section>
+<section id="admin" class="hidden"><div class="panel"><h2>Verwaltung</h2><p id="who"></p><button id="logout" class="secondary">Abmelden</button>
+<nav><button data-view="campaign">Ausschreibungen</button><button data-view="modules">Module</button><button data-view="students">Schüler</button></nav></div>
+<div id="campaign" class="panel"><h2>Neue Ausschreibung</h2><form id="campaignForm">
+<label>Titel<input name="title" required></label><label>Beginn<input type="datetime-local" name="starts_at" required></label>
+<label>Ende<input type="datetime-local" name="ends_at" required></label>
+<label>Module pro Schüler<input type="number" name="modules_per_student" min="1" max="20" value="1" required></label>
+<label>Anzahl Wünsche<input type="number" name="max_preferences" min="1" max="50" value="3" required></label>
+<button>Entwurf speichern</button></form><div id="campaignList"></div></div>
+<div id="modules" class="panel hidden"><h2>Module erfassen</h2><form id="moduleForm">
+<label>Ausschreibung<select name="campaign_id" id="moduleCampaign" required></select></label>
+<label>Titel<input name="title" required></label><label>Beschreibung<textarea name="description"></textarea></label>
+<label>Mindestplätze<input name="min_capacity" type="number" min="0" value="0" required></label>
+<label>Maximalplätze<input name="max_capacity" type="number" min="1" value="20" required></label><button>Modul speichern</button></form><div id="moduleList"></div></div>
+<div id="students" class="panel hidden"><h2>Schüler importieren</h2><p>CSV-Spalten: <code>external_id,first_name,last_name,class</code>. Noch keine echten Schülerdaten importieren, bis die Anwendung getestet ist.</p>
+<input id="csv" type="file" accept=".csv,text/csv"><button id="import">CSV importieren</button><p id="studentCount"></p></div></section>
+</main><footer>OSZ Rapperswil · Eigenständiges Lernmodul-Tool · <a href="https://schulen-rapperswil.ch/oberstufenzentrum/">Schulhomepage</a></footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/dist/umd/supabase.min.js"></script><script>
+const db=window.supabase.createClient('https://htqcyvhzrtrmtlqqdzly.supabase.co','sb_publishable_PtdT07j6tRnoH0Y2tFRnhw_sSqa4UnE');
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const notice=(msg,error=false)=>{$('notice').textContent=msg;$('notice').style.color=error?'#a02b28':'#236747'};
+async function catalog(){const {data,error}=await db.from('campaigns').select('id,title,ends_at,modules(id,title,description)').eq('status','open');
+$('catalog').innerHTML=error?'Der Katalog ist zurzeit nicht verfügbar.':!data?.length?'Zurzeit sind keine Ausschreibungen offen.':data.map(c=>'<h3>'+esc(c.title)+'</h3><p class="muted">Anmeldung bis '+esc(new Date(c.ends_at).toLocaleString('de-CH'))+'</p><div class="modules">'+(c.modules||[]).map(m=>'<article class="module"><strong>'+esc(m.title)+'</strong><p>'+esc(m.description)+'</p></article>').join('')+'</div>').join('')}
+async function check(){const {data:{user}}=await db.auth.getUser();let admin=false;
+if(user){const {data}=await db.from('admin_users').select('user_id').eq('user_id',user.id).maybeSingle();admin=!!data;if(!admin)notice('E-Mail bestätigen oder Administratorfreigabe prüfen.',true)}
+$('auth').classList.toggle('hidden',!!user);$('admin').classList.toggle('hidden',!admin);if(admin){$('who').textContent=user.email;await refresh()}}
+$('login').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});notice(error?.message||'Angemeldet',!!error);await check()};
+$('signup').onclick=async()=>{const email=$('email').value.trim().toLowerCase();if(email!=='lia.lehmann@bluewin.ch')return notice('Diese Erstregistrierung ist für die freigegebene Administratoradresse vorgesehen.',true);
+const {error}=await db.auth.signUp({email,password:$('password').value,emailRedirectTo:location.origin+location.pathname});notice(error?.message||'Bitte die Bestätigungs-E-Mail öffnen.',!!error)};
+$('reset').onclick=async()=>{const {error}=await db.auth.resetPasswordForEmail($('email').value.trim(),{redirectTo:location.origin+location.pathname});notice(error?.message||'Falls das Konto existiert, wird eine E-Mail versendet.',!!error)};
+db.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY'){const p=prompt('Neues Passwort (mindestens 12 Zeichen)');if(p?.length>=12)db.auth.updateUser({password:p}).then(({error})=>notice(error?.message||'Passwort geändert',!!error))}});
+$('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>['campaign','modules','students'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.view)));
+async function refresh(){const {data,error}=await db.from('campaigns').select('*').order('created_at',{ascending:false});if(error)return notice(error.message,true);
+$('campaignList').innerHTML='<h3>Ausschreibungen</h3><table><tr><th>Titel</th><th>Ende</th><th>Status</th></tr>'+data.map(c=>'<tr><td>'+esc(c.title)+'</td><td>'+esc(new Date(c.ends_at).toLocaleString('de-CH'))+'</td><td>'+esc(c.status)+'</td></tr>').join('')+'</table>';
+$('moduleCampaign').innerHTML=data.map(c=>'<option value="'+c.id+'">'+esc(c.title)+'</option>').join('');
+const {count}=await db.from('students').select('id',{count:'exact',head:true});$('studentCount').textContent=(count??0)+' Schüler gespeichert';
+const {data:mods}=await db.from('modules').select('title,max_capacity');$('moduleList').innerHTML=(mods||[]).map(m=>'<p>'+esc(m.title)+' – maximal '+m.max_capacity+' Plätze</p>').join('')}
+$('campaignForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.modules_per_student=+a.modules_per_student;a.max_preferences=+a.max_preferences;
+if(a.max_preferences<a.modules_per_student)return notice('Mindestens so viele Wünsche wie Module erforderlich.',true);
+a.starts_at=new Date(a.starts_at).toISOString();a.ends_at=new Date(a.ends_at).toISOString();
+const {error}=await db.from('campaigns').insert(a);notice(error?.message||'Entwurf gespeichert',!!error);if(!error){e.target.reset();await refresh()}};
+$('moduleForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;
+const {error}=await db.from('modules').insert(a);notice(error?.message||'Modul gespeichert',!!error);if(!error)await refresh()};
+function parseCSV(t){const lines=t.replace(/^\uFEFF/,'').trim().split(/\r?\n/);const sep=lines[0].includes(';')?';':',';const headers=lines.shift().split(sep).map(x=>x.trim());
+return lines.filter(Boolean).map(line=>Object.fromEntries(line.split(sep).map((v,i)=>[headers[i],v.trim().replace(/^"|"$/g,'')])))}
+$('import').onclick=async()=>{const file=$('csv').files[0];if(!file)return notice('CSV auswählen',true);const rows=parseCSV(await file.text());
+if(!rows.length||rows.some(r=>!r.external_id||!r.first_name||!r.last_name||!r.class))return notice('Benötigt external_id,first_name,last_name,class',true);
+const names=[...new Set(rows.map(r=>r.class))];const {error:ce}=await db.from('classes').upsert(names.map(name=>({name})),{onConflict:'name'});if(ce)return notice(ce.message,true);
+const {data:classes,error:le}=await db.from('classes').select('id,name');if(le)return notice(le.message,true);const map=Object.fromEntries(classes.map(c=>[c.name,c.id]));
+const {error}=await db.from('students').upsert(rows.map(r=>({external_id:r.external_id,first_name:r.first_name,last_name:r.last_name,class_id:map[r.class]})),{onConflict:'external_id'});
+notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error)await refresh()};
+catalog();check();
+</script></body></html>
