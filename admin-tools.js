@@ -64,6 +64,7 @@
       const {error}=await db.from('student_access_codes').insert(insert);if(error)throw error;
       exportCsv('lernmodule-zugangscodes-'+new Date().toISOString().slice(0,10)+'.csv',rows);
       message(missing.length+' persönliche Zugangscodes erstellt. Die CSV-Datei sicher aufbewahren.');
+      window.learningGuideAdvance?.('codes');
     }catch(e){message(e.message||'Code-Erstellung fehlgeschlagen.',true)}
     finally{button.disabled=false;}
   });
@@ -195,6 +196,7 @@
       if(error)throw error;
       message('Teilnehmerliste gespeichert: '+data.added+' hinzugefügt, '+data.removed+' entfernt, '+data.total+' insgesamt zugelassen.');
       await loadEligible();
+      window.learningGuideAdvance?.('eligibility');
     }catch(err){
       message(err.message||'Speichern der Auswahl fehlgeschlagen.',true);
     }finally{button.disabled=!eligibleReady;}
@@ -217,6 +219,7 @@
       message('Freigegeben: sichtbar ab '+new Date(c.starts_at).toLocaleString('de-CH')+'.');
       await campaigns();await window.refresh();await window.catalog();
       if(typeof window.loadLearningSignup==='function')await window.loadLearningSignup();
+      window.learningGuideAdvance?.('publish');
     }catch(e){message(e.message||'Freigabe fehlgeschlagen.',true)}
   });
   const origRefresh=window.refresh;
