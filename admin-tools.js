@@ -45,42 +45,54 @@
     }
     await loadEligible();
   }
+  // Zugangscodes zentral auf dem Server ausgeben und für spätere PDFs verschlüsselt speichern.
   $('generateCodes').addEventListener('click',async()=>{
     const button=$('generateCodes');button.disabled=true;
     try{
-      const {data:students,error:a}=await db.from('students').select('id,external_id,first_name,last_name,classes(name)').eq('active',true).limit(1000);
-      if(a)throw a;if(!students.length)return message('Bitte zuerst Schüler importieren.',true);
-      const {data:codes,error:b}=await db.from('student_access_codes').select('student_id').limit(1000);
-      if(b)throw b;
-      const known=new Set((codes||[]).map(c=>c.student_id));
-      const missing=students.filter(s=>!known.has(s.id));
-      if(!missing.length)return message('Für alle Schüler sind bereits Codes hinterlegt.');
-      const insert=[],rows=[['Schueler_ID','Vorname','Nachname','Klasse','Zugangscode']];
-      for(const s of missing){
-        const code=await newCode();
-        insert.push({student_id:s.id,code_hash:code.hash});
-        rows.push([s.external_id,s.first_name,s.last_name,s.classes?.name||'',code.value]);
-      }
-      const {error}=await db.from('student_access_codes').insert(insert);if(error)throw error;
-      exportCsv('lernmodule-zugangscodes-'+new Date().toISOString().slice(0,10)+'.csv',rows);
-      message(missing.length+' persönliche Zugangscodes erstellt. Die CSV-Datei sicher aufbewahren.');
+      const students=await fetchActiveForCodes();
+      if(!students.length)return message('Bitte zuerst Schüler importieren.',true);
+      const {data,error}=await db.rpc('issue_learning_student_codes',{
+        p_student_ids:students.map(s=>s.id),p_replace:false
+      });
+      if(error)throw error;
+      if(!data?.length)return message('Alle Schüler haben bereits einen Code. Bereits erstellte Codes können in der Schülerdatenbank aus der bisherigen CSV übernommen werden.');
+      exportCsv('lernmodule-neue-zugangscodes.csv',[
+        ['Schueler_ID','Vorname','Nachname','Klasse','Zugangscode'],
+        ...data.map(s=>[s.external_id,s.first_name,s.last_name,s.class_name||'',s.access_code])
+      ]);
+      message(data.length+' neue Codes erstellt und verschlüsselt gespeichert. Druck unter «Schülerdatenbank».');
       window.learningGuideAdvance?.('codes');
     }catch(e){message(e.message||'Code-Erstellung fehlgeschlagen.',true)}
     finally{button.disabled=false;}
   });
+  async function fetchActiveForCodes(){
+    const all=[];
+    for(let i=0;i<1500;i+=500){
+      const {data,error}=await db.from('students').select('id').eq('active',true).order('id').range(i,i+499);
+      if(error)throw error;all.push(...(data||[]));if((data||[]).length<500)return all;
+    }
+    throw Error('Zu viele Schüler für diese Stapelverarbeitung.');
+  }
   $('rotateCode').addEventListener('click',async()=>{
-    const id=$('rotateStudent').value.trim();if(!id)return message('Schüler-ID eingeben.',true);
-    if(!confirm('Der bisherige Zugangscode wird ungültig. Neuen Code erstellen?'))return;
+    const id=$('rotateStudent').value.trim();
+    if(!id)return message('Schüler-ID eingeben.',true);
+    if(!confirm('Neuen Code ausstellen? Der bisherige Zugangscode wird UNGÜLTIG.'))return;
     try{
-      const {data:s,error:e}=await db.from('students').select('id,external_id,first_name,last_name').eq('external_id',id).single();
-      if(e||!s)throw new Error('Schüler-ID nicht gefunden.');
-      const code=await newCode();
-      const {error}=await db.from('student_access_codes').upsert({student_id:s.id,code_hash:code.hash},{onConflict:'student_id'});if(error)throw error;
-      exportCsv('lernmodule-code-'+s.external_id+'.csv',[['Schueler_ID','Vorname','Nachname','Zugangscode'],[s.external_id,s.first_name,s.last_name,code.value]]);
-      message('Der Zugangscode wurde ersetzt und heruntergeladen.');
-    }catch(e){message(e.message||'Code-Ersetzung fehlgeschlagen.',true)}
+      const {data:student,error:e}=await db.from('students')
+        .select('id,external_id,first_name,last_name').eq('external_id',id).single();
+      if(e)throw e;
+      const {data,error}=await db.rpc('issue_learning_student_codes',{
+        p_student_ids:[student.id],p_replace:true
+      });
+      if(error)throw error;
+      const item=data[0];
+      exportCsv('lernmodule-code-'+student.external_id+'.csv',[
+        ['Schueler_ID','Vorname','Nachname','Zugangscode'],
+        [student.external_id,student.first_name,student.last_name,item.access_code]
+      ]);
+      message('Neuer Zugangscode gespeichert. Der alte ist ungültig. Karte unter Schülerdatenbank drucken.');
+    }catch(e){message(e.message||'Codewechsel fehlgeschlagen.',true)}
   });
-
   // Eine unabhängige Auswahl pro Ausschreibung mit Klassen- und Namensfilter.
   let eligibleStudents=[],currentAllowed=new Set(),chosen=new Set(),alreadyRegistered=new Set();
   let eligibleStatus='',eligibleReady=false;
