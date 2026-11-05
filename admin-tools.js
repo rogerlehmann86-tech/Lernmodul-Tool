@@ -39,8 +39,8 @@
     const {data,error}=await db.from('campaigns').select('id,title,status').order('created_at',{ascending:false});
     if(error)return;
     for(const id of ['eligibleCampaign','publishCampaign']){
-      const el=$(id),saved=el.value;
-      el.innerHTML=(data||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(c.status)+')</option>').join('');
+      const el=$(id),saved=window.learningCurrentCampaignId||el.value;
+      el.innerHTML=(data||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(window.learningStatusLabel(c.status))+')</option>').join('');
       if(data.some(c=>c.id===saved))el.value=saved;
     }
     await loadEligible();
