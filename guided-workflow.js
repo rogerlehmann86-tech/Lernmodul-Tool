@@ -206,7 +206,7 @@
   }
   window.learningChooseCampaign=choose;
   async function count(table,filter){
-    let query=db.from(table).select('id',{count:'exact',head:true});
+    let query=db.from(table).select('*',{count:'exact',head:true});
     if(filter)query=filter(query);
     const {count,error}=await query;
     if(error)throw error;
