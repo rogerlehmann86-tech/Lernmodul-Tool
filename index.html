@@ -46,7 +46,7 @@ button:disabled{opacity:.58;cursor:not-allowed}
 <button id="reloadSignups" class="secondary" type="button">Anmeldungen aktualisieren</button>
 </section>
 <section id="auth" class="panel"><h2>Administration</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
-<label>E-Mail<input id="email" type="email" autocomplete="email" value="lia.lehmann@bluewin.ch"></label>
+<label>E-Mail<input id="email" type="email" autocomplete="email" placeholder="E-Mail der Schulverwaltung"></label>
 <label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
 <button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button>
 <p><small>Die Erstregistrierung wird erst nach E-Mail-Bestätigung freigeschaltet.</small></p></section>
@@ -77,8 +77,9 @@ async function check(){const {data:{user}}=await db.auth.getUser();let admin=fal
 if(user){const {data}=await db.from('admin_users').select('user_id').eq('user_id',user.id).maybeSingle();admin=!!data;if(!admin)notice('E-Mail bestätigen oder Administratorfreigabe prüfen.',true)}
 $('auth').classList.toggle('hidden',!!user);$('admin').classList.toggle('hidden',!admin);if(admin){$('who').textContent=user.email;await refresh()}}
 $('login').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});notice(error?.message||'Angemeldet',!!error);await check()};
-$('signup').onclick=async()=>{const email=$('email').value.trim().toLowerCase();if(email!=='lia.lehmann@bluewin.ch')return notice('Diese Erstregistrierung ist für die freigegebene Administratoradresse vorgesehen.',true);
-const {error}=await db.auth.signUp({email,password:$('password').value,emailRedirectTo:location.origin+location.pathname});notice(error?.message||'Bitte die Bestätigungs-E-Mail öffnen.',!!error)};
+$('signup').onclick=async()=>{const email=$('email').value.trim().toLowerCase();const password=$('password').value;
+if(!email||password.length<12)return notice('Bitte E-Mail und ein Passwort mit mindestens 12 Zeichen eingeben.',true);
+const {error}=await db.auth.signUp({email,password,emailRedirectTo:location.origin+location.pathname});notice(error?.message||'Bitte die Bestätigungs-E-Mail öffnen. Nur freigegebene Konten erhalten Verwaltungsrechte.',!!error)};
 $('reset').onclick=async()=>{const {error}=await db.auth.resetPasswordForEmail($('email').value.trim(),{redirectTo:location.origin+location.pathname});notice(error?.message||'Falls das Konto existiert, wird eine E-Mail versendet.',!!error)};
 db.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY'){const p=prompt('Neues Passwort (mindestens 12 Zeichen)');if(p?.length>=12)db.auth.updateUser({password:p}).then(({error})=>notice(error?.message||'Passwort geändert',!!error))}});
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
@@ -112,7 +113,7 @@ row=[];item='';
 if(quoted)throw Error('Nicht geschlossene Anführungszeichen in CSV.');
 row.push(item.trim());if(row.some(Boolean))parsed.push(row);
 if(!parsed.length)return[];
-const known={id:'external_id',schueler_id:'external_id',schuelernummer:'external_id',schuelerid:'external_id',external_id:'external_id',vorname:'first_name',first_name:'first_name',nachname:'last_name',name:'last_name',last_name:'last_name',klasse:'class',class:'class'};
+const known={id:'external_id',schuler_id:'external_id',schulerid:'external_id',schulernummer:'external_id',schueler_id:'external_id',schuelernummer:'external_id',schuelerid:'external_id',external_id:'external_id',vorname:'first_name',first_name:'first_name',nachname:'last_name',name:'last_name',last_name:'last_name',klasse:'class',class:'class'};
 const headers=parsed.shift().map(s=>known[s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_]/g,'_')]||s);
 return parsed.map(values=>Object.fromEntries(headers.map((h,i)=>[h,values[i]??''])));
 }
