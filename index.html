@@ -115,7 +115,7 @@ button:disabled{opacity:.58;cursor:not-allowed}
 <section id="auth" class="panel" hidden><h2>Administration – Anmeldung</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
 <label>E-Mail<input id="email" type="email" autocomplete="email" placeholder="E-Mail der Schulverwaltung"></label>
 <label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
-<button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button>
+<button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button><button type="button" id="loginLogout" class="secondary" hidden>Von diesem Konto abmelden</button>
 <p><small>Die Erstregistrierung wird erst nach E-Mail-Bestätigung freigeschaltet.</small></p></section>
 <section id="admin" class="hidden"><div class="panel"><h2>Verwaltung</h2><p id="who"></p><button id="logout" class="secondary">Abmelden</button>
 <nav><button data-view="campaign">Ausschreibungen</button><button data-view="modules">Module</button><button data-view="students">Schüler</button><button data-view="allocation">Zuteilung</button></nav></div>
@@ -148,7 +148,7 @@ function showView(mode){
   $('studentView').hidden=!student;
   $('auth').hidden=!login;
   $('admin').classList.toggle('hidden',!admin);
-  $('showStudentView').hidden=!isAdminAccount;
+  $('showStudentView').hidden=student;
   const adminButton=$('showAdminView');
   adminButton.textContent=isAdminAccount?'Zur Verwaltung':'Administration';
   adminButton.setAttribute('aria-pressed',String(admin));
@@ -156,7 +156,7 @@ function showView(mode){
   $('siteHeading').textContent=admin?'Lernmodule – Verwaltung':login?'Administration':'Lernmodule';
   $('siteSubtitle').textContent=admin?'Ausschreibungen und Modulzuteilungen organisieren':login?'Geschützter Zugang für die Schulverwaltung':'Module entdecken · Wünsche planen';
 }
-$('showStudentView').onclick=()=>{if(isAdminAccount)showView('student')};
+$('showStudentView').onclick=()=>showView('student');
 $('showAdminView').onclick=()=>showView(isAdminAccount?'admin':'login');
 async function check(){
  const {data:{user},error:authError}=await db.auth.getUser();
@@ -167,6 +167,7 @@ async function check(){
    if(!admin)notice('Dieses Konto hat keine Administratorberechtigung. Bitte die Freigabe prüfen oder abmelden.',true);
  }
  isAdminAccount=admin;
+ $('loginLogout').hidden=!user;
  if(admin){
    $('who').textContent=user.email;
    showView('admin');
@@ -184,6 +185,7 @@ const {error}=await db.auth.signUp({email,password,emailRedirectTo:location.orig
 $('reset').onclick=async()=>{const {error}=await db.auth.resetPasswordForEmail($('email').value.trim(),{redirectTo:location.origin+location.pathname});notice(error?.message||'Falls das Konto existiert, wird eine E-Mail versendet.',!!error)};
 db.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY'){const p=prompt('Neues Passwort (mindestens 12 Zeichen)');if(p?.length>=12)db.auth.updateUser({password:p}).then(({error})=>notice(error?.message||'Passwort geändert',!!error))}});
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
+$('loginLogout').onclick=async()=>{await db.auth.signOut();isAdminAccount=false;$('loginLogout').hidden=true;notice('Abgemeldet.');showView('student')};
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>['campaign','modules','students','allocation'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.view)));
 async function refresh(){const {data,error}=await db.from('campaigns').select('*').order('created_at',{ascending:false});if(error)return notice(error.message,true);
 $('campaignList').innerHTML='<h3>Ausschreibungen</h3><table><tr><th>Titel</th><th>Ende</th><th>Status</th></tr>'+data.map(c=>'<tr><td>'+esc(c.title)+'</td><td>'+esc(new Date(c.ends_at).toLocaleString('de-CH'))+'</td><td>'+esc(c.status)+'</td></tr>').join('')+'</table>';
