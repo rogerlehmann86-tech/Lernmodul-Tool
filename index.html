@@ -13,10 +13,38 @@ button:focus-visible,input:focus-visible{outline:3px solid #e5ad63;outline-offse
 #notice{white-space:pre-wrap;margin:12px 0}small,.muted{color:var(--muted)}.modules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .module{border:1px solid var(--line);padding:14px;border-radius:8px;background:#fbfbf9}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line)}
 footer{max-width:1050px;margin:30px auto;padding:15px 18px;color:var(--muted);font-size:13px}
+
+.student-panel{border-top:4px solid var(--accent)}
+.student-panel form[hidden]{display:none}
+.student-auth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.student-auth-grid label{margin:0}
+.tool-section{border-top:1px solid var(--line);padding:18px 0}
+.tool-section h3{font-size:20px;margin:0 0 8px}
+.tool-section button{max-width:100%}
+#preferenceFields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:12px 0}
+#preferenceFields p{grid-column:1/-1;margin:0}
+#preferenceFields label{margin:0}
+button:disabled{opacity:.58;cursor:not-allowed}
+@media(max-width:640px){.panel{padding:18px}#admin nav button{width:100%}header{padding:22px 18px}}
 </style></head>
 <body><header><div class="brand">Oberstufenzentrum Rapperswil</div><h1>Lernmodule</h1><div>Module entdecken · Wünsche planen · Schulverwaltung</div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
 <section class="panel"><h2>Aktuelle Ausschreibungen</h2><div id="catalog">Wird geladen …</div></section>
+<section class="panel student-panel" id="studentEnrollment">
+<h2>Deine Modulwünsche</h2>
+<p id="studentSignupInfo">Aktuelle Anmeldung wird geladen …</p>
+<form id="studentSignup" hidden>
+<label>Ausschreibung<select id="signupCampaign" required></select></label>
+<div class="student-auth-grid">
+<label>Deine Schüler-ID<input id="studentExternalId" name="studentId" autocomplete="off" required placeholder="Schüler-ID laut Zugangskarte"></label>
+<label>Dein persönlicher Zugangscode<input id="studentAccessCode" name="studentCode" autocomplete="off" required placeholder="XXXX-XXXX-XXXX-XXXX"></label>
+</div>
+<div id="preferenceFields"></div>
+<button id="submitPreferences" type="submit">Wünsche verbindlich speichern</button>
+<p class="muted"><small>Die Auswahl kann nach dem Absenden nur durch die Schulverwaltung korrigiert werden. Bitte speichere deine Zugangsdaten nicht auf einem gemeinsam benutzten Gerät.</small></p>
+</form>
+<button id="reloadSignups" class="secondary" type="button">Anmeldungen aktualisieren</button>
+</section>
 <section id="auth" class="panel"><h2>Administration</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
 <label>E-Mail<input id="email" type="email" autocomplete="email" value="lia.lehmann@bluewin.ch"></label>
 <label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
@@ -75,4 +103,7 @@ const {data:classes,error:le}=await db.from('classes').select('id,name');if(le)r
 const {error}=await db.from('students').upsert(rows.map(r=>({external_id:r.external_id,first_name:r.first_name,last_name:r.last_name,class_id:map[r.class]})),{onConflict:'external_id'});
 notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error)await refresh()};
 catalog();check();
-</script></body></html>
+</script>
+<script src="student-signup.js" defer></script>
+<script src="admin-tools.js" defer></script>
+</body></html>
