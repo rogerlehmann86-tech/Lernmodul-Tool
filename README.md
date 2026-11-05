@@ -2,6 +2,15 @@
 
 **Testversion** der Verwaltung von Lernmodulen für Schülerinnen und Schüler. Weboberfläche auf GitHub Pages; Daten, Zugriffsrechte und serverseitige Berechnung auf einem **eigenen Supabase-Projekt**. Andere Tools und Datenbanken bleiben getrennt.
 
+## Getrennte Schüler- und Administratoransicht
+
+- Ohne Admin-Anmeldung erscheint ausschliesslich die Schüleransicht mit Modulkatalog, Wunschabgabe und persönlichem Ergebnisabruf.
+- Über **Administration** im Kopfbereich öffnet sich das gesonderte Anmeldeformular.
+- Nach erfolgreicher Prüfung des Administratorkontos wird ausschliesslich die geführte Verwaltung angezeigt. Die drei öffentlichen Schülerbereiche stehen nicht mehr darüber.
+- Ein Administrator kann über **Schüleransicht** die öffentliche Ansicht kontrollieren und mit **Zur Verwaltung** zurückwechseln, ohne sich abmelden zu müssen.
+- Der Ansichtswechsel ist eine reine Darstellungssache. Die Datenbankrechte werden weiterhin ausschliesslich durch Authentifizierung und Row Level Security gesteuert.
+- Für einen direkten Link zum Administrator-Login kann die Adresse mit `?ansicht=admin` verwendet werden; ein bereits angemeldeter Administrator kommt standardmässig sofort in die Verwaltung.
+
 ## Geführte Verwaltung (neues Bedienkonzept)
 
 Die Administration ist nun als **Akkordeon mit acht Schritten** aufgebaut:
