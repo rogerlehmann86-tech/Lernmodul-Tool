@@ -21,8 +21,17 @@
     '<button class="secondary" id="generateCodes">Fehlende Zugangscodes erzeugen</button>'+
     '<label>Schüler-ID für Ersatzcode<input id="rotateStudent" placeholder="Schüler-ID"></label>'+
     '<button class="secondary" id="rotateCode">Einzelnen Code ersetzen</button></div>'+
-    '<div class="tool-section"><h3>Für Ausschreibung zulassen</h3><label>Ausschreibung'+
-    '<select id="eligibleCampaign"></select></label><button id="enrollAll" class="secondary">Alle aktiven Schüler zulassen</button></div>'+
+    '<div class="tool-section"><h3>Teilnehmende der Ausschreibung</h3>'+
+    '<p class="muted">Wähle einzelne Schüler, eine bestimmte Klasse oder alle aus. Die Auswahl gilt nur für diese Ausschreibung.</p>'+
+    '<label>Ausschreibung<select id="eligibleCampaign"></select></label>'+
+    '<div class="eligibility-filters"><label>Klasse<select id="eligibleClass"><option value="">Alle Klassen</option></select></label>'+
+    '<label>Schüler suchen<input id="eligibleSearch" placeholder="Name oder Schüler-ID" autocomplete="off"></label></div>'+
+    '<div class="eligibility-actions"><button type="button" id="eligibleSelectVisible" class="secondary">Angezeigte auswählen</button>'+
+    '<button type="button" id="eligibleDeselectVisible" class="secondary">Angezeigte abwählen</button></div>'+
+    '<p id="eligibleSummary" class="muted" role="status">Schülerliste wird geladen …</p>'+
+    '<div id="eligibleList" class="eligibility-list"></div>'+
+    '<button type="button" id="eligibleSave">Auswahl speichern</button>'+
+    '<p class="muted"><small>Bereits angemeldete Schüler sind gesperrt und können nicht aus der Ausschreibung entfernt werden.</small></p></div>'+
     '<div class="tool-section"><h3>Ausschreibung veröffentlichen</h3><label>Ausschreibung'+
     '<select id="publishCampaign"></select></label><button id="publishNow">Zur geplanten Zeit freigeben</button></div>'
   );
@@ -34,6 +43,7 @@
       el.innerHTML=(data||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(c.status)+')</option>').join('');
       if(data.some(c=>c.id===saved))el.value=saved;
     }
+    await loadEligible();
   }
   $('generateCodes').addEventListener('click',async()=>{
     const button=$('generateCodes');button.disabled=true;
@@ -69,22 +79,125 @@
       message('Der Zugangscode wurde ersetzt und heruntergeladen.');
     }catch(e){message(e.message||'Code-Ersetzung fehlgeschlagen.',true)}
   });
-  $('enrollAll').addEventListener('click',async()=>{
-    const campaign_id=$('eligibleCampaign').value;
-    if(!campaign_id)return message('Bitte zuerst eine Ausschreibung erstellen.',true);
-    if(!confirm('Alle aktiven Schüler für die Ausschreibung zulassen?'))return;
-    const button=$('enrollAll');button.disabled=true;
+
+  // Eine unabhängige Auswahl pro Ausschreibung mit Klassen- und Namensfilter.
+  let eligibleStudents=[],currentAllowed=new Set(),chosen=new Set(),alreadyRegistered=new Set();
+  let eligibleStatus='',eligibleReady=false;
+  async function fetchPaged(table,fields,filter,order){
+    const all=[];
+    for(let offset=0;offset<=3500;offset+=500){
+      let query=db.from(table).select(fields).range(offset,offset+499);
+      if(order)query=query.order(order);
+      if(filter)query=filter(query);
+      const {data,error}=await query;
+      if(error)throw error;
+      all.push(...(data||[]));
+      if((data||[]).length<500)return all;
+    }
+    throw Error('Mehr als 3500 Datensätze. Bitte Schulverwaltung kontaktieren.');
+  }
+  function shownStudents(){
+    const klass=$('eligibleClass').value;
+    const term=$('eligibleSearch').value.trim().toLocaleLowerCase('de-CH');
+    return eligibleStudents.filter(s=>{
+      if(klass&&s.classes?.name!==klass)return false;
+      return !term||[s.external_id,s.first_name,s.last_name].join(' ').toLocaleLowerCase('de-CH').includes(term);
+    });
+  }
+  function renderEligible(){
+    const view=shownStudents();
+    const selectedCount=eligibleStudents.filter(s=>chosen.has(s.id)).length;
+    $('eligibleSummary').textContent=selectedCount+' von '+eligibleStudents.length+' aktiven Schülern ausgewählt · '+
+      alreadyRegistered.size+' bereits angemeldet · '+view.length+' angezeigt'+
+      (eligibleStatus==='allocated'||eligibleStatus==='published'||eligibleStatus==='archived'?' · Auswahl gesperrt':'');
+    $('eligibleList').innerHTML=view.length?view.map(s=>{
+      const locked=alreadyRegistered.has(s.id);
+      return '<label class="eligible-item"><input type="checkbox" data-student="'+esc(s.id)+'" '+
+        (chosen.has(s.id)?'checked ':'')+(locked||!['draft','open'].includes(eligibleStatus)?'disabled ':'')+'>'+
+        '<span><strong>'+esc(s.last_name+' '+s.first_name)+'</strong><small>'+
+        esc(' · '+(s.classes?.name||'ohne Klasse')+' · '+s.external_id)+
+        (locked?' · Bereits angemeldet':'')+'</small></span></label>';
+    }).join(''):'<p class="muted">Keine Schüler für diesen Filter gefunden.</p>';
+    const editable=eligibleReady&&['draft','open'].includes(eligibleStatus);
+    $('eligibleSave').disabled=!editable;
+    $('eligibleSelectVisible').disabled=!editable;
+    $('eligibleDeselectVisible').disabled=!editable;
+  }
+  async function loadEligible(){
+    const id=$('eligibleCampaign').value;
+    eligibleReady=false;
+    $('eligibleSave').disabled=true;
+    $('eligibleSummary').textContent='Schüler und Zulassungen werden geladen …';
+    $('eligibleList').innerHTML='';
+    chosen=new Set();currentAllowed=new Set();alreadyRegistered=new Set();eligibleStudents=[];
+    if(!id){$('eligibleSummary').textContent='Bitte zuerst eine Ausschreibung erstellen.';return;}
     try{
-      const {data:students,error:e}=await db.from('students').select('id').eq('active',true).limit(1000);
-      if(e)throw e;if(!students.length)return message('Keine aktiven Schüler vorhanden.',true);
-      for(let i=0;i<students.length;i+=100){
-        const part=students.slice(i,i+100).map(s=>({campaign_id,student_id:s.id}));
-        const {error}=await db.from('campaign_students').upsert(part,{onConflict:'campaign_id,student_id',ignoreDuplicates:true});
-        if(error)throw error;
-      }
-      message(students.length+' Schüler für die Ausschreibung zugelassen.');
-    }catch(e){message(e.message||'Zulassung fehlgeschlagen.',true)}
-    finally{button.disabled=false;}
+      const [campaign,students,allowed,registrations]=await Promise.all([
+        db.from('campaigns').select('status').eq('id',id).single(),
+        fetchPaged('students','id,external_id,first_name,last_name,classes(name)',
+          q=>q.eq('active',true),'last_name'),
+        fetchPaged('campaign_students','student_id',q=>q.eq('campaign_id',id),'student_id'),
+        fetchPaged('registrations','student_id',q=>q.eq('campaign_id',id),'student_id')
+      ]);
+      if(campaign.error)throw campaign.error;
+      eligibleStatus=campaign.data.status;
+      eligibleStudents=students;
+      currentAllowed=new Set(allowed.map(x=>x.student_id));
+      chosen=new Set(currentAllowed);
+      alreadyRegistered=new Set(registrations.map(x=>x.student_id));
+      const oldClass=$('eligibleClass').value;
+      const classes=[...new Set(eligibleStudents.map(x=>x.classes?.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de-CH'));
+      $('eligibleClass').innerHTML='<option value="">Alle Klassen</option>'+
+        classes.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+      if(classes.includes(oldClass))$('eligibleClass').value=oldClass;
+      for(const student of eligibleStudents)if(alreadyRegistered.has(student.id))chosen.add(student.id);
+      eligibleReady=true;
+      renderEligible();
+    }catch(err){
+      eligibleReady=false;
+      $('eligibleSummary').textContent='Fehler beim Laden: '+(err.message||'Unbekannter Fehler');
+      $('eligibleSave').disabled=true;
+      message(err.message||'Teilnehmerliste konnte nicht geladen werden.',true);
+    }
+  }
+  $('eligibleCampaign').addEventListener('change',loadEligible);
+  $('eligibleClass').addEventListener('change',renderEligible);
+  $('eligibleSearch').addEventListener('input',renderEligible);
+  $('eligibleList').addEventListener('change',e=>{
+    const checkbox=e.target.closest('input[data-student]');
+    if(!checkbox)return;
+    const id=checkbox.dataset.student;
+    if(alreadyRegistered.has(id)){checkbox.checked=true;return;}
+    if(checkbox.checked)chosen.add(id);else chosen.delete(id);
+    renderEligible();
+  });
+  $('eligibleSelectVisible').addEventListener('click',()=>{
+    for(const s of shownStudents())chosen.add(s.id);
+    renderEligible();
+  });
+  $('eligibleDeselectVisible').addEventListener('click',()=>{
+    for(const s of shownStudents())if(!alreadyRegistered.has(s.id))chosen.delete(s.id);
+    renderEligible();
+  });
+  $('eligibleSave').addEventListener('click',async()=>{
+    const campaign_id=$('eligibleCampaign').value;
+    if(!eligibleReady||!campaign_id)return;
+    const ids=eligibleStudents.filter(s=>chosen.has(s.id)).map(s=>s.id);
+    const additions=ids.filter(id=>!currentAllowed.has(id)).length;
+    const removals=eligibleStudents.filter(s=>currentAllowed.has(s.id)&&!chosen.has(s.id)).length;
+    if(!additions&&!removals)return message('Keine Änderungen an der Teilnehmerliste.');
+    if(!confirm(additions+' Schüler zulassen und '+removals+' entfernen?\nBereits angemeldete Schüler bleiben geschützt.'))return;
+    const button=$('eligibleSave');button.disabled=true;
+    try{
+      const {data,error}=await db.rpc('set_campaign_participants',{
+        p_campaign_id:campaign_id,p_student_ids:ids
+      });
+      if(error)throw error;
+      message('Teilnehmerliste gespeichert: '+data.added+' hinzugefügt, '+data.removed+' entfernt, '+data.total+' insgesamt zugelassen.');
+      await loadEligible();
+    }catch(err){
+      message(err.message||'Speichern der Auswahl fehlgeschlagen.',true);
+    }finally{button.disabled=!eligibleReady;}
   });
   $('publishNow').addEventListener('click',async()=>{
     const id=$('publishCampaign').value;if(!id)return message('Ausschreibung fehlt.',true);
