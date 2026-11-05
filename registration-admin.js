@@ -35,11 +35,11 @@
    throw Error('Zu viele Datensätze.');
  }
  async function loadCampaigns(){
-   const old=$('registrationCampaign').value;
+   const old=window.learningCurrentCampaignId||$('registrationCampaign').value;
    const {data,error}=await db.from('campaigns').select('id,title,status,max_preferences').order('created_at',{ascending:false});
    if(error)return;
    campaigns=data||[];
-   $('registrationCampaign').innerHTML=campaigns.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(c.status)+')</option>').join('');
+   $('registrationCampaign').innerHTML=campaigns.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(window.learningStatusLabel(c.status))+')</option>').join('');
    if(campaigns.some(c=>c.id===old))$('registrationCampaign').value=old;
  }
  async function load(){
