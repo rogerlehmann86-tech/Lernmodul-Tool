@@ -78,9 +78,22 @@ button:disabled{opacity:.58;cursor:not-allowed}
 #admin nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #admin nav button.guide-nav-active{box-shadow:inset 0 0 0 2px #1f3436;background:#e6eceb;color:var(--ink)}
 @media(max-width:650px){.guide-intro,.guide-step>summary{padding:16px}.guide-content{padding:0 16px 16px}.guide-heading strong{font-size:16px}.guide-intro button{width:100%}}
+
+/* Getrennte Ansichten: Schüler und Verwaltung teilen keine sichtbaren Inhaltsbereiche. */
+[hidden]{display:none !important}
+.site-head{max-width:1050px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.site-navigation{display:flex;gap:8px;flex-wrap:wrap}
+.site-navigation button{margin:0;white-space:nowrap}
+.site-navigation button[aria-pressed="true"]{background:var(--accent)}
+#studentView{display:block}
+#studentView>section{margin-bottom:18px}
+#auth{max-width:660px;margin:20px auto 30px}
+#admin>.panel:first-child{border-top:4px solid var(--accent)}
+@media(max-width:650px){.site-head{align-items:flex-start}.site-navigation{width:100%}.site-navigation button{flex:1}}
 </style></head>
-<body><header><div class="brand">Oberstufenzentrum Rapperswil</div><h1>Lernmodule</h1><div>Module entdecken · Wünsche planen · Schulverwaltung</div></header>
+<body><header><div class="site-head"><div><div class="brand">Oberstufenzentrum Rapperswil</div><h1 id="siteHeading">Lernmodule</h1><div id="siteSubtitle">Module entdecken · Wünsche planen</div></div><nav class="site-navigation" aria-label="Ansichten wechseln"><button type="button" id="showStudentView" class="secondary" hidden>Schüleransicht</button><button type="button" id="showAdminView" class="secondary">Administration</button></nav></div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
+<div id="studentView" hidden>
 <section class="panel"><h2>Aktuelle Ausschreibungen</h2><div id="catalog">Wird geladen …</div></section>
 <section class="panel student-panel" id="studentEnrollment">
 <h2>Deine Modulwünsche</h2>
@@ -98,7 +111,8 @@ button:disabled{opacity:.58;cursor:not-allowed}
 <button id="reloadSignups" class="secondary" type="button">Anmeldungen aktualisieren</button>
 </section>
 <section id="publishedResults" class="panel"></section>
-<section id="auth" class="panel"><h2>Administration</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
+</div>
+<section id="auth" class="panel" hidden><h2>Administration – Anmeldung</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
 <label>E-Mail<input id="email" type="email" autocomplete="email" placeholder="E-Mail der Schulverwaltung"></label>
 <label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
 <button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button>
@@ -126,10 +140,44 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const notice=(msg,error=false)=>{$('notice').textContent=msg;$('notice').style.color=error?'#a02b28':'#236747'};
 async function catalog(){const {data,error}=await db.from('campaigns').select('id,title,ends_at,modules(id,title,description)').eq('status','open');
 $('catalog').innerHTML=error?'Der Katalog ist zurzeit nicht verfügbar.':!data?.length?'Zurzeit sind keine Ausschreibungen offen.':data.map(c=>'<h3>'+esc(c.title)+'</h3><p class="muted">Anmeldung bis '+esc(new Date(c.ends_at).toLocaleString('de-CH'))+'</p><div class="modules">'+(c.modules||[]).map(m=>'<article class="module"><strong>'+esc(m.title)+'</strong><p>'+esc(m.description)+'</p></article>').join('')+'</div>').join('')}
-async function check(){const {data:{user}}=await db.auth.getUser();let admin=false;
-if(user){const {data}=await db.from('admin_users').select('user_id').eq('user_id',user.id).maybeSingle();admin=!!data;if(!admin)notice('E-Mail bestätigen oder Administratorfreigabe prüfen.',true)}
-$('auth').classList.toggle('hidden',!!user);$('admin').classList.toggle('hidden',!admin);if(admin){$('who').textContent=user.email;await refresh()}}
-$('login').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});notice(error?.message||'Angemeldet',!!error);await check()};
+let isAdminAccount=false;
+let activeView='student';
+function showView(mode){
+  activeView=mode;
+  const student=mode==='student',admin=mode==='admin',login=mode==='login';
+  $('studentView').hidden=!student;
+  $('auth').hidden=!login;
+  $('admin').classList.toggle('hidden',!admin);
+  $('showStudentView').hidden=!isAdminAccount;
+  const adminButton=$('showAdminView');
+  adminButton.textContent=isAdminAccount?'Zur Verwaltung':'Administration';
+  adminButton.setAttribute('aria-pressed',String(admin));
+  $('showStudentView').setAttribute('aria-pressed',String(student));
+  $('siteHeading').textContent=admin?'Lernmodule – Verwaltung':login?'Administration':'Lernmodule';
+  $('siteSubtitle').textContent=admin?'Ausschreibungen und Modulzuteilungen organisieren':login?'Geschützter Zugang für die Schulverwaltung':'Module entdecken · Wünsche planen';
+}
+$('showStudentView').onclick=()=>{if(isAdminAccount)showView('student')};
+$('showAdminView').onclick=()=>showView(isAdminAccount?'admin':'login');
+async function check(){
+ const {data:{user},error:authError}=await db.auth.getUser();
+ let admin=false;
+ if(user&&!authError){
+   const {data,error}=await db.from('admin_users').select('user_id').eq('user_id',user.id).maybeSingle();
+   admin=!error&&!!data;
+   if(!admin)notice('Dieses Konto hat keine Administratorberechtigung. Bitte die Freigabe prüfen oder abmelden.',true);
+ }
+ isAdminAccount=admin;
+ if(admin){
+   $('who').textContent=user.email;
+   showView('admin');
+   await refresh();
+ }else if(user){
+   showView('login');
+ }else{
+   showView(new URLSearchParams(location.search).get('ansicht')==='admin'?'login':'student');
+ }
+}
+$('login').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){notice(error.message,true);return;}notice('Angemeldet');await check()};
 $('signup').onclick=async()=>{const email=$('email').value.trim().toLowerCase();const password=$('password').value;
 if(!email||password.length<12)return notice('Bitte E-Mail und ein Passwort mit mindestens 12 Zeichen eingeben.',true);
 const {error}=await db.auth.signUp({email,password,emailRedirectTo:location.origin+location.pathname});notice(error?.message||'Bitte die Bestätigungs-E-Mail öffnen. Nur freigegebene Konten erhalten Verwaltungsrechte.',!!error)};
