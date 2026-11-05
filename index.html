@@ -38,6 +38,17 @@ button:disabled{opacity:.58;cursor:not-allowed}
 #allocationNotice{white-space:pre-wrap}
 #timeSlotList{margin:12px 0}
 #timeSlotList p{margin:5px 0}
+
+.eligibility-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.eligibility-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.eligibility-list{border:1px solid var(--line);border-radius:8px;max-height:320px;overflow:auto;margin:10px 0 14px;background:#fff}
+.eligible-item{display:flex;align-items:center;gap:12px;margin:0;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:400;cursor:pointer}
+.eligible-item:last-child{border-bottom:none}
+.eligible-item:hover{background:#f5f7f5}
+.eligible-item input[type="checkbox"]{width:auto;margin:0;flex:0 0 auto}
+.eligible-item span{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.eligible-item small{font-weight:400;color:var(--muted)}
+.eligible-item:has(input:disabled){opacity:.72;cursor:default}
 </style></head>
 <body><header><div class="brand">Oberstufenzentrum Rapperswil</div><h1>Lernmodule</h1><div>Module entdecken · Wünsche planen · Schulverwaltung</div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
