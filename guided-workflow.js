@@ -1,228 +1,288 @@
-/* Geführte Administration: aufklappbare, jederzeit manuell bedienbare Schritte. */
+/* Verwaltung: zuerst Ausschreibung wählen, danach schrittweise bearbeiten. */
 (() => {
   'use strict';
-
-  const byId = id => document.getElementById(id);
-  const stepDefinitions = [
-    {id:'campaign', title:'Ausschreibung anlegen', help:'Lege zuerst Zeitraum, Modulanzahl und Anzahl der Wünsche fest.'},
-    {id:'modules', title:'Module und Zeitblöcke erfassen', help:'Erfasse alle angebotenen Module. Optional kannst du Zeitblöcke für die spätere Zuteilung anlegen.'},
-    {id:'students', title:'Schüler importieren', help:'Importiere eine Schülerliste als CSV. Bereits vorhandene Schüler werden über ihre eindeutige ID aktualisiert.'},
-    {id:'codes', title:'Persönliche Zugangscodes', help:'Erzeuge die Zugangscodes und bewahre die heruntergeladene Datei geschützt auf.'},
-    {id:'eligibility', title:'Teilnehmende auswählen', help:'Wähle die Klassen oder einzelnen Schüler, die an dieser Ausschreibung teilnehmen dürfen.'},
-    {id:'publish', title:'Anmeldung freigeben', help:'Prüfe die Angaben und gib dann die Anmeldung zum vorgesehenen Zeitraum frei.'},
-    {id:'registration', title:'Anmeldungen kontrollieren', help:'Kontrolliere die abgegebenen Wünsche, fehlende Anmeldungen und nötige Nachmeldungen.'},
-    {id:'allocation', title:'Module zuteilen und Ergebnisse freigeben', help:'Berechne die Verteilung, kontrolliere sie und veröffentliche die Resultate erst nach der Prüfung.'}
+  const $=id=>document.getElementById(id);
+  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const steps=[
+    {id:'campaign',title:'Ausschreibung',hint:'Zeitraum, Modulanzahl und Wünsche prüfen oder einen Entwurf bearbeiten.'},
+    {id:'modules',title:'Module und Zeitblöcke',hint:'Module erfassen, bearbeiten oder löschen und Zeitblöcke zuordnen.'},
+    {id:'students',title:'Schüler importieren',hint:'Schülerstammdaten verwalten und die CSV-Liste aktualisieren.'},
+    {id:'codes',title:'Persönliche Zugangscodes',hint:'Zugangscodes für die Schüler erzeugen oder ersetzen.'},
+    {id:'eligibility',title:'Teilnehmende auswählen',hint:'Klassen und einzelne Schüler für diese Ausschreibung zulassen.'},
+    {id:'publish',title:'Anmeldung freigeben',hint:'Den Entwurf nach der Kontrolle für Schüler öffnen.'},
+    {id:'registration',title:'Anmeldungen kontrollieren',hint:'Wunschlisten, fehlende und verspätete Anmeldungen prüfen.'},
+    {id:'allocation',title:'Zuteilung und Ergebnisse',hint:'Berechnen, kontrollieren, exportieren und veröffentlichen.'}
   ];
-  const guide = new Map();
-  let manuallyNavigated = false;
-  let currentUserId = null;
-
-  const admin = byId('admin');
-  const topPanel = admin?.querySelector(':scope > .panel');
-  if (!admin || !topPanel || !byId('campaign') || !byId('modules') || !byId('students') || !byId('allocation')) return;
-
-  const area = document.createElement('div');
-  area.id = 'learningGuide';
-  area.className = 'guide';
-  area.innerHTML =
-    '<div class="guide-intro"><div><h2>Geführte Einrichtung</h2>' +
-    '<p>Schritt für Schritt zur fertigen Ausschreibung. Jeder Bereich lässt sich jederzeit manuell öffnen oder schliessen.</p></div>' +
-    '<button class="secondary" type="button" id="guideSuggested">Nächsten sinnvollen Schritt anzeigen</button></div>' +
+  const admin=$('admin'),bar=admin?.querySelector(':scope > .admin-toolbar');
+  if(!admin||!bar||!$('campaign')||!$('modules')||!$('students')||!$('allocation'))return;
+  const chooser=document.createElement('section');
+  chooser.id='campaignOverview';
+  chooser.className='panel campaign-overview';
+  chooser.hidden=true;
+  chooser.innerHTML='<div class="campaign-header"><div><h2>Ausschreibungen</h2>'+
+    '<p class="muted">Wähle eine Ausschreibung zum Bearbeiten oder erstelle eine neue.</p></div>'+
+    '<button id="newCampaign" type="button">Neue Ausschreibung</button></div>'+
+    '<div id="campaignCards"></div>';
+  bar.insertAdjacentElement('afterend',chooser);
+  const guide=document.createElement('section');
+  guide.id='learningGuide';guide.className='guide';guide.hidden=true;
+  guide.innerHTML='<div class="guide-intro"><div><h2 id="guideTitle">Ausschreibung</h2>'+
+    '<p id="guideSubtitle" class="muted">Bearbeite die folgenden Abschnitte in beliebiger Reihenfolge.</p></div>'+
+    '<button class="secondary" type="button" id="guideSuggested">Nächsten sinnvollen Schritt anzeigen</button></div>'+
     '<p id="guideProgress" class="guide-progress" role="status" aria-live="polite"></p>';
-  topPanel.insertAdjacentElement('afterend',area);
-
-  const bodies = new Map();
-  stepDefinitions.forEach((step,i) => {
-    const details = document.createElement('details');
-    details.className = 'guide-step';
-    details.dataset.step = step.id;
-    details.innerHTML =
-      '<summary><span class="guide-number">'+(i+1)+'</span>'+
-      '<span class="guide-heading"><strong>'+step.title+'</strong><small>'+step.help+'</small></span>'+
-      '<span class="guide-chevron" aria-hidden="true"></span></summary>' +
+  chooser.insertAdjacentElement('afterend',guide);
+  const detailsMap=new Map(),innerMap=new Map();
+  steps.forEach((step,i)=>{
+    const details=document.createElement('details');
+    details.className='guide-step';details.dataset.step=step.id;
+    details.innerHTML='<summary><span class="guide-number">'+(i+1)+'</span>'+
+      '<span class="guide-heading"><strong>'+step.title+'</strong><small>'+step.hint+'</small></span>'+
+      '<span class="guide-chevron" aria-hidden="true"></span></summary>'+
       '<div class="guide-content"><div class="guide-inner"></div>'+
       '<div class="guide-actions">'+
-      (i>0?'<button type="button" class="secondary" data-guide-nav="'+stepDefinitions[i-1].id+'">Zurück</button>':'')+
-      (i<stepDefinitions.length-1?'<button type="button" data-guide-nav="'+stepDefinitions[i+1].id+'">Weiter: '+stepDefinitions[i+1].title+'</button>':'')+
+      (i>0?'<button type="button" class="secondary" data-guide-nav="'+steps[i-1].id+'">Zurück</button>':'')+
+      (i+1<steps.length?'<button type="button" data-guide-nav="'+steps[i+1].id+'">Weiter: '+steps[i+1].title+'</button>':'')+
       '</div></div>';
-    const body = details.querySelector('.guide-inner');
-    area.appendChild(details);
-    guide.set(step.id,details);
-    bodies.set(step.id,body);
+    guide.appendChild(details);
+    detailsMap.set(step.id,details);
+    innerMap.set(step.id,details.querySelector('.guide-inner'));
     details.addEventListener('toggle',()=>{
-      if(details.open) {
-        details.classList.add('guide-open');
-        for(const other of guide.values())if(other!==details)other.open=false;
-      } else {
-        details.classList.remove('guide-open');
+      if(details.open)for(const other of detailsMap.values())if(other!==details)other.open=false;
+    });
+  });
+  // DOM-Knoten behalten ihre bestehenden Listener und Berechtigungen.
+  for(const key of ['campaign','modules','allocation']){
+    const el=$(key);
+    el.classList.remove('hidden');el.classList.add('guide-original');
+    innerMap.get(key).appendChild(el);
+  }
+  const studentPanel=$('students'),sections=[...studentPanel.querySelectorAll(':scope > .tool-section')];
+  const targets=[['codes','#generateCodes'],['eligibility','#eligibleSave'],['publish','#publishNow'],['registration','#registrationLoad']];
+  for(const [step,selector] of targets){
+    const el=sections.find(x=>x.querySelector(selector));
+    if(el){el.classList.add('guide-original');innerMap.get(step).appendChild(el);}
+    else innerMap.get(step).textContent='Der Abschnitt konnte nicht geladen werden.';
+  }
+  studentPanel.classList.remove('hidden');studentPanel.classList.add('guide-original');
+  innerMap.get('students').appendChild(studentPanel);
+
+  // Jede Ausschreibung wird nur über die gemeinsame Auswahl gesteuert.
+  let selectedId=null,selectedCampaign=null,operationSerial=0;
+  window.learningCurrentCampaignId=null;
+  window.learningCampaignEditing=false;
+  window.learningEditingModuleId=null;
+  const selectors=['moduleCampaign','eligibleCampaign','publishCampaign','registrationCampaign','allocationCampaign'];
+  for(const id of selectors){
+    const el=$(id);
+    if(el?.closest('label'))el.closest('label').hidden=true;
+  }
+  function openStep(id,focus=false){
+    if(!guide.hidden&&detailsMap.has(id)){
+      for(const [name,elem] of detailsMap)elem.open=name===id;
+      if(focus){
+        detailsMap.get(id).scrollIntoView({
+          behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',
+          block:'start'
+        });
       }
-    });
-  });
-
-  // Vorhandene Formulare und ihre Event-Listener bleiben intakt: Wir verschieben nur DOM-Knoten.
-  for(const id of ['campaign','modules','allocation']){
-    const elem=byId(id);
-    elem.classList.remove('hidden');
-    elem.classList.add('guide-original');
-    bodies.get(id).appendChild(elem);
-  }
-  const studentSection = byId('students');
-  const subSections = Array.from(studentSection.querySelectorAll(':scope > .tool-section'));
-  const subTarget = [
-    ['codes','#generateCodes'],
-    ['eligibility','#eligibleSave'],
-    ['publish','#publishNow'],
-    ['registration','#registrationLoad']
-  ];
-  for(const [step,childSelector] of subTarget) {
-    const matching=subSections.find(el=>el.querySelector(childSelector));
-    if(matching) {
-      matching.classList.add('guide-original');
-      bodies.get(step).appendChild(matching);
-    } else {
-      const warning=document.createElement('p');
-      warning.className='muted';
-      warning.textContent='Dieser Verwaltungsbereich konnte nicht geladen werden. Bitte die Seite neu laden.';
-      bodies.get(step).appendChild(warning);
     }
   }
-  studentSection.classList.remove('hidden');
-  studentSection.classList.add('guide-original');
-  bodies.get('students').appendChild(studentSection);
-
-  function openStep(id,{manual=false,focus=false}={}) {
-    const chosen=guide.get(id);
-    if(!chosen)return;
-    if(manual)manuallyNavigated=true;
-    for(const [key,details] of guide)details.open=key===id;
-    document.querySelectorAll('#admin [data-view]').forEach(button=>{
-      const target=button.dataset.view;
-      button.classList.toggle('guide-nav-active',
-        target===(id==='codes'||id==='eligibility'||id==='publish'||id==='registration'?'students':id));
-      button.setAttribute('aria-pressed',String(button.classList.contains('guide-nav-active')));
-    });
-    if(focus){
-      chosen.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+  function updateForm(){
+    const title=$('campaignFormTitle'),form=$('campaignForm');
+    const info=$('campaignFormInfo');
+    if(!selectedCampaign){
+      title.textContent='Neue Ausschreibung';
+      info.textContent='Erstelle eine neue Ausschreibung. Danach kannst du die Module erfassen.';
+      form.hidden=false;form.reset();
+      $('campaignSave').textContent='Entwurf erstellen';
+      $('deleteCampaign').hidden=true;
+      $('campaignCancelEdit').hidden=true;
+      window.learningCampaignEditing=false;
+      return;
+    }
+    title.textContent=selectedCampaign.status==='draft'?'Ausschreibung bearbeiten':'Ausschreibung im Überblick';
+    info.textContent='Status: '+window.learningStatusLabel(selectedCampaign.status)+
+      ' · Nach der Freigabe bleiben die Stammdaten zunächst gesperrt.';
+    const draft=selectedCampaign.status==='draft';
+    form.hidden=!draft;
+    window.learningCampaignEditing=draft;
+    $('campaignSave').textContent='Änderungen speichern';
+    $('deleteCampaign').hidden=!draft;
+    $('campaignCancelEdit').hidden=false;
+    if(draft){
+      for(const name of ['title','modules_per_student','max_preferences']){
+        form.elements.namedItem(name).value=selectedCampaign[name]??'';
+      }
+      const dateValue=v=>{
+        const d=new Date(v);
+        return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      };
+      form.elements.namedItem('starts_at').value=dateValue(selectedCampaign.starts_at);
+      form.elements.namedItem('ends_at').value=dateValue(selectedCampaign.ends_at);
     }
   }
-  // Bereits vorhandene Register-Buttons bleiben als Direktnavigation zu den Schritten erhalten.
-  document.querySelectorAll('#admin [data-view]').forEach(button=>{
-    button.onclick=()=>{
-      const target=button.dataset.view;
-      const next=target==='students'?'students':target;
-      openStep(next,{manual:true,focus:true});
-    };
-  });
-  area.addEventListener('click',event=>{
-    const button=event.target.closest('[data-guide-nav]');
-    if(!button)return;
-    openStep(button.dataset.guideNav,{manual:true,focus:true});
-  });
-  area.addEventListener('click',event=>{
-    if(event.target.closest('summary'))manuallyNavigated=true;
-  });
-
-  async function getCount(table,filter){
-    let query=db.from(table).select('*',{count:'exact',head:true});
+  function resetModuleForm(){
+    window.learningEditingModuleId=null;
+    const f=$('moduleForm');
+    if(f)f.reset();
+    if($('moduleSave'))$('moduleSave').textContent='Modul speichern';
+    if($('moduleCancelEdit'))$('moduleCancelEdit').hidden=true;
+  }
+  async function syncForms(){
+    // refresh() baut bestehende Auswahllisten neu; danach wird die gemeinsame Auswahl gesetzt.
+    if(typeof window.refresh==='function')await window.refresh();
+    const campaignId=selectedId;
+    if(!campaignId)return;
+    for(const id of selectors){
+      const el=$(id);
+      if(!el)continue;
+      if([...el.options].some(o=>o.value===campaignId)){
+        el.value=campaignId;
+        el.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+    }
+  }
+  async function listCampaigns(){
+    const {data,error}=await db.from('campaigns').select('id,title,status,starts_at,ends_at,created_at')
+      .order('created_at',{ascending:false});
+    if(error)throw error;
+    $('campaignCards').innerHTML=data?.length?
+      '<div class="campaign-card-list">'+data.map(c=>
+        '<button type="button" class="campaign-card" data-select-campaign="'+esc(c.id)+'">'+
+        '<span class="campaign-card-main"><strong>'+esc(c.title)+'</strong><small>'+
+        new Date(c.starts_at).toLocaleDateString('de-CH')+' – '+new Date(c.ends_at).toLocaleDateString('de-CH')+
+        '</small></span><span class="campaign-status">'+esc(window.learningStatusLabel(c.status))+
+        '</span><span aria-hidden="true">›</span></button>'
+      ).join('')+'</div>':'<p class="muted">Noch keine Ausschreibungen vorhanden. Du kannst jetzt einen neuen Entwurf anlegen.</p>';
+  }
+  async function overview(){
+    operationSerial++;
+    selectedId=null;selectedCampaign=null;
+    window.learningCurrentCampaignId=null;
+    window.learningCampaignEditing=false;
+    resetModuleForm();
+    guide.hidden=true;chooser.hidden=false;
+    $('selectedCampaignLabel').textContent='Bitte Ausschreibung auswählen';
+    await listCampaigns();
+  }
+  window.learningOpenCampaignOverview=overview;
+  function selectNew(){
+    operationSerial++;
+    selectedId=null;selectedCampaign=null;
+    window.learningCurrentCampaignId=null;
+    window.learningCampaignEditing=false;
+    resetModuleForm();
+    chooser.hidden=true;guide.hidden=false;
+    for(const [key,details] of detailsMap)details.hidden=key!=='campaign';
+    $('selectedCampaignLabel').textContent='Neue Ausschreibung';
+    $('guideTitle').textContent='Neue Ausschreibung';
+    $('guideSubtitle').textContent='Beginne mit den Angaben zur neuen Ausschreibung.';
+    $('guideProgress').textContent='Schritt 1: Ausschreibung als Entwurf speichern.';
+    updateForm();
+    openStep('campaign',true);
+  }
+  window.learningChooseNewCampaign=selectNew;
+  async function choose(id,{step=null}={}){
+    if(!id)return overview();
+    const request=++operationSerial;
+    const {data,error}=await db.from('campaigns').select('*').eq('id',id).single();
+    if(request!==operationSerial)return;
+    if(error||!data){alert('Ausschreibung wurde nicht gefunden.');return overview();}
+    selectedId=data.id;selectedCampaign=data;
+    window.learningCurrentCampaignId=data.id;
+    window.learningCampaignEditing=data.status==='draft';
+    resetModuleForm();
+    chooser.hidden=true;guide.hidden=false;
+    for(const details of detailsMap.values())details.hidden=false;
+    $('selectedCampaignLabel').textContent=data.title+' · '+window.learningStatusLabel(data.status);
+    $('guideTitle').textContent=data.title;
+    $('guideSubtitle').textContent='Status: '+window.learningStatusLabel(data.status)+
+      ' · Öffne einen Abschnitt, um die Ausschreibung zu bearbeiten.';
+    updateForm();
+    await syncForms();
+    if(request!==operationSerial)return;
+    if(step)openStep(step,true);
+    else await suggest();
+  }
+  window.learningChooseCampaign=choose;
+  async function count(table,filter){
+    let query=db.from(table).select('id',{count:'exact',head:true});
     if(filter)query=filter(query);
     const {count,error}=await query;
     if(error)throw error;
     return count??0;
   }
-  async function suggest({force=false}={}){
-    const {data:{user}}=await db.auth.getUser();
-    if(!user) return;
-    const {data:adminRow,error:adminError}=await db.from('admin_users')
-      .select('user_id').eq('user_id',user.id).maybeSingle();
-    if(adminError||!adminRow) return;
-    currentUserId=user.id;
-    if(manuallyNavigated&&!force)return;
-    const {data:campaigns,error}=await db.from('campaigns')
-      .select('id,title,status,max_preferences').order('created_at',{ascending:false}).limit(1);
-    if(error)throw error;
-    const progress=byId('guideProgress');
-    if(!campaigns?.length){
-      progress.textContent='Noch keine Ausschreibung vorhanden. Beginne bei Schritt 1.';
-      openStep('campaign');
-      return;
-    }
-    const campaign=campaigns[0];
-    const [moduleCount,studentCount,allowedCount,registrationCount,codeCount] = await Promise.all([
-      getCount('modules',q=>q.eq('campaign_id',campaign.id).eq('active',true)),
-      getCount('students',q=>q.eq('active',true)),
-      getCount('campaign_students',q=>q.eq('campaign_id',campaign.id)),
-      getCount('registrations',q=>q.eq('campaign_id',campaign.id)),
-      getCount('student_access_codes')
+  async function suggest(){
+    if(!selectedId||!selectedCampaign)return;
+    const id=selectedId,c=selectedCampaign;
+    const [modules,students,allowed,registrations,codes]=await Promise.all([
+      count('modules',q=>q.eq('campaign_id',id).eq('active',true)),
+      count('students',q=>q.eq('active',true)),
+      count('campaign_students',q=>q.eq('campaign_id',id)),
+      count('registrations',q=>q.eq('campaign_id',id)),
+      count('student_access_codes')
     ]);
-    let next;
-    if(campaign.status==='draft'){
-      if(moduleCount<campaign.max_preferences)next='modules';
-      else if(!studentCount)next='students';
-      else if(codeCount<studentCount)next='codes';
-      else if(!allowedCount)next='eligibility';
+    if(selectedId!==id)return;
+    let next='campaign';
+    if(c.status==='draft'){
+      if(modules<c.max_preferences)next='modules';
+      else if(!students)next='students';
+      else if(codes<students)next='codes';
+      else if(!allowed)next='eligibility';
       else next='publish';
-    } else if(campaign.status==='open') {
-      next=codeCount<studentCount?'codes':'registration';
-    } else if(campaign.status==='closed'||campaign.status==='allocated'){
-      next='allocation';
-    } else if(campaign.status==='published'){
-      next='allocation';
-    } else next='campaign';
-
-    progress.textContent='Aktuelle Ausschreibung: '+campaign.title+' · '+moduleCount+' Module · '+
-      allowedCount+' zugelassene Schüler · '+registrationCount+' Anmeldungen · Status: '+campaign.status+'.';
-    openStep(next,{focus:force});
+    }else if(c.status==='open')next=codes<students?'codes':'registration';
+    else if(['closed','allocated','published'].includes(c.status))next='allocation';
+    $('guideProgress').textContent=modules+' aktive Module · '+allowed+
+      ' zugelassene Schüler · '+registrations+' Anmeldungen · '+window.learningStatusLabel(c.status);
+    openStep(next);
   }
-
-  byId('guideSuggested').addEventListener('click',()=>{
-    manuallyNavigated=false;
-    suggest({force:true}).catch(err=>{
-      byId('guideProgress').textContent='Schritt konnte nicht ermittelt werden: '+err.message;
-    });
+  $('chooseCampaigns').addEventListener('click',()=>overview().catch(err=>alert(err.message)));
+  $('newCampaign').addEventListener('click',selectNew);
+  $('campaignCards').addEventListener('click',event=>{
+    const button=event.target.closest('[data-select-campaign]');
+    if(button)choose(button.dataset.selectCampaign).catch(err=>alert(err.message));
   });
-
-  window.learningGuideAdvance=async function(completedStep,options={}) {
+  guide.addEventListener('click',event=>{
+    const button=event.target.closest('[data-guide-nav]');
+    if(button)openStep(button.dataset.guideNav,true);
+  });
+  $('guideSuggested').addEventListener('click',()=>{
+    suggest().catch(err=>$('guideProgress').textContent=err.message);
+  });
+  window.learningGuideOpenStep=openStep;
+  window.learningGuideAdvance=async function(completedStep){
     const next={
-      campaign:'modules',
-      modules:'students',
-      students:'codes',
-      codes:'eligibility',
-      eligibility:'publish',
-      publish:'registration',
-      registration:'allocation'
+      campaign:'modules',modules:'students',students:'codes',codes:'eligibility',
+      eligibility:'publish',publish:'registration',registration:'allocation'
     }[completedStep];
-    // Bei mehreren Modulen erst zum Import wechseln, wenn die geforderte Wunschanzahl erreicht ist.
-    if(completedStep==='modules'&&!options.force){
-      const campaignId=byId('moduleCampaign')?.value;
-      if(!campaignId)return;
-      const {data:campaign,error:campaignError}=await db.from('campaigns')
-        .select('max_preferences').eq('id',campaignId).maybeSingle();
-      if(campaignError||!campaign)return;
-      const moduleCount=await getCount('modules',q=>q.eq('campaign_id',campaignId).eq('active',true));
-      if(moduleCount<campaign.max_preferences){
-        byId('guideProgress').textContent='Modul gespeichert: '+moduleCount+' von mindestens '+
-          campaign.max_preferences+' Modulen erfasst. Du kannst weitere Module hinzufügen.';
+    if(!selectedId)return;
+    if(completedStep==='modules'){
+      const {data}=await db.from('campaigns').select('max_preferences').eq('id',selectedId).single();
+      const n=await count('modules',q=>q.eq('campaign_id',selectedId).eq('active',true));
+      if(data&&n<data.max_preferences){
+        $('guideProgress').textContent='Noch '+(data.max_preferences-n)+
+          ' Modul(e) erfassen, damit alle Wünsche möglich sind.';
         return;
       }
     }
-    if(next) {
-      manuallyNavigated=false;
-      openStep(next,{focus:true});
-      byId('guideProgress').textContent='Schritt gespeichert. Als Nächstes: '+
-        (stepDefinitions.find(step=>step.id===next)?.title||next)+
-        '. Du kannst jeden Abschnitt später erneut öffnen.';
+    if(next){
+      openStep(next,true);
+      $('guideProgress').textContent='Nächster Schritt: '+steps.find(s=>s.id===next)?.title;
     }
   };
-
-  // Erste Stufe als sanfter Standard. Bestehende Daten entscheiden über den passenden Start.
-  openStep('campaign');
-  db.auth.onAuthStateChange((event)=>{
-    if(event==='SIGNED_IN'){
-      Promise.resolve().then(()=>suggest()).catch(()=>{});
+  // Bei jeder Sitzung zuerst die Ausschreibung wählen – keine Vermischung von Kampagnen.
+  async function init(){
+    const {data:{user}}=await db.auth.getUser();
+    if(!user)return;
+    const {data}=await db.from('admin_users').select('user_id').eq('user_id',user.id).maybeSingle();
+    if(data)await overview();
+  }
+  db.auth.onAuthStateChange(event=>{
+    if(event==='SIGNED_IN')Promise.resolve().then(init).catch(()=>{});
+    if(event==='SIGNED_OUT'){
+      chooser.hidden=true;guide.hidden=true;
+      selectedId=null;window.learningCurrentCampaignId=null;
     }
   });
-  suggest().catch(()=>{});
-
-  // Exakt eine offene Stufe bleibt übersichtlich; summary selbst darf diese auch schliessen.
-  window.learningGuideOpenStep=openStep;
+  init().catch(()=>{});
 })();
