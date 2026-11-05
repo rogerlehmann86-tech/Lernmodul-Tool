@@ -26,6 +26,18 @@ footer{max-width:1050px;margin:30px auto;padding:15px 18px;color:var(--muted);fo
 #preferenceFields label{margin:0}
 button:disabled{opacity:.58;cursor:not-allowed}
 @media(max-width:640px){.panel{padding:18px}#admin nav button{width:100%}header{padding:22px 18px}}
+
+.alloc-scroll{overflow-x:auto;max-width:100%;margin:12px 0}
+#allocationTable{min-width:700px}
+#allocationTable select{min-width:150px}
+#allocationTable input[type=checkbox]{width:auto;display:inline-block}
+.alloc-editor{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0;margin:16px 0}
+#allocationResult>button{margin-top:10px}
+#allocationSummary{padding:16px;background:#f7f8f5;border-radius:8px}
+#allocationSummary h3{margin-top:0}
+#allocationNotice{white-space:pre-wrap}
+#timeSlotList{margin:12px 0}
+#timeSlotList p{margin:5px 0}
 </style></head>
 <body><header><div class="brand">Oberstufenzentrum Rapperswil</div><h1>Lernmodule</h1><div>Module entdecken · Wünsche planen · Schulverwaltung</div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
@@ -51,7 +63,7 @@ button:disabled{opacity:.58;cursor:not-allowed}
 <button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button>
 <p><small>Die Erstregistrierung wird erst nach E-Mail-Bestätigung freigeschaltet.</small></p></section>
 <section id="admin" class="hidden"><div class="panel"><h2>Verwaltung</h2><p id="who"></p><button id="logout" class="secondary">Abmelden</button>
-<nav><button data-view="campaign">Ausschreibungen</button><button data-view="modules">Module</button><button data-view="students">Schüler</button></nav></div>
+<nav><button data-view="campaign">Ausschreibungen</button><button data-view="modules">Module</button><button data-view="students">Schüler</button><button data-view="allocation">Zuteilung</button></nav></div>
 <div id="campaign" class="panel"><h2>Neue Ausschreibung</h2><form id="campaignForm">
 <label>Titel<input name="title" required></label><label>Beginn<input type="datetime-local" name="starts_at" required></label>
 <label>Ende<input type="datetime-local" name="ends_at" required></label>
@@ -60,11 +72,11 @@ button:disabled{opacity:.58;cursor:not-allowed}
 <button>Entwurf speichern</button></form><div id="campaignList"></div></div>
 <div id="modules" class="panel hidden"><h2>Module erfassen</h2><form id="moduleForm">
 <label>Ausschreibung<select name="campaign_id" id="moduleCampaign" required></select></label>
-<label>Titel<input name="title" required></label><label>Beschreibung<textarea name="description"></textarea></label>
+<label>Titel<input name="title" required></label><label>Beschreibung<textarea name="description"></textarea></label><label>Zeitblock (optional)<select name="time_slot_id" id="moduleTimeSlot"><option value="">Kein Zeitblock</option></select></label>
 <label>Mindestplätze<input name="min_capacity" type="number" min="0" value="0" required></label>
 <label>Maximalplätze<input name="max_capacity" type="number" min="1" value="20" required></label><button>Modul speichern</button></form><div id="moduleList"></div></div>
 <div id="students" class="panel hidden"><h2>Schüler importieren</h2><p>CSV-Spalten: <code>external_id,first_name,last_name,class</code>. Noch keine echten Schülerdaten importieren, bis die Anwendung getestet ist.</p>
-<input id="csv" type="file" accept=".csv,text/csv"><button id="import">CSV importieren</button><p id="studentCount"></p></div></section>
+<input id="csv" type="file" accept=".csv,text/csv"><button id="import">CSV importieren</button><p id="studentCount"></p></div><div id="allocation" class="panel hidden"></div></section>
 </main><footer>OSZ Rapperswil · Eigenständiges Lernmodul-Tool · <a href="https://schulen-rapperswil.ch/oberstufenzentrum/">Schulhomepage</a></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/dist/umd/supabase.min.js"></script><script>
 const db=window.supabase.createClient('https://htqcyvhzrtrmtlqqdzly.supabase.co','sb_publishable_PtdT07j6tRnoH0Y2tFRnhw_sSqa4UnE');
@@ -83,7 +95,7 @@ const {error}=await db.auth.signUp({email,password,emailRedirectTo:location.orig
 $('reset').onclick=async()=>{const {error}=await db.auth.resetPasswordForEmail($('email').value.trim(),{redirectTo:location.origin+location.pathname});notice(error?.message||'Falls das Konto existiert, wird eine E-Mail versendet.',!!error)};
 db.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY'){const p=prompt('Neues Passwort (mindestens 12 Zeichen)');if(p?.length>=12)db.auth.updateUser({password:p}).then(({error})=>notice(error?.message||'Passwort geändert',!!error))}});
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>['campaign','modules','students'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.view)));
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>['campaign','modules','students','allocation'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.view)));
 async function refresh(){const {data,error}=await db.from('campaigns').select('*').order('created_at',{ascending:false});if(error)return notice(error.message,true);
 $('campaignList').innerHTML='<h3>Ausschreibungen</h3><table><tr><th>Titel</th><th>Ende</th><th>Status</th></tr>'+data.map(c=>'<tr><td>'+esc(c.title)+'</td><td>'+esc(new Date(c.ends_at).toLocaleString('de-CH'))+'</td><td>'+esc(c.status)+'</td></tr>').join('')+'</table>';
 $('moduleCampaign').innerHTML=data.map(c=>'<option value="'+c.id+'">'+esc(c.title)+'</option>').join('');
@@ -93,7 +105,7 @@ $('campaignForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntri
 if(a.max_preferences<a.modules_per_student)return notice('Mindestens so viele Wünsche wie Module erforderlich.',true);
 a.starts_at=new Date(a.starts_at).toISOString();a.ends_at=new Date(a.ends_at).toISOString();
 const {error}=await db.from('campaigns').insert(a);notice(error?.message||'Entwurf gespeichert',!!error);if(!error){e.target.reset();await refresh()}};
-$('moduleForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;
+$('moduleForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;if(!a.time_slot_id)delete a.time_slot_id;
 const {error}=await db.from('modules').insert(a);notice(error?.message||'Modul gespeichert',!!error);if(!error)await refresh()};
 function parseCSV(text){
 text=text.replace(/^\uFEFF/,'');
@@ -127,4 +139,6 @@ catalog();check();
 </script>
 <script src="student-signup.js" defer></script>
 <script src="admin-tools.js" defer></script>
+<script src="time-slot-admin.js" defer></script>
+<script src="allocation-admin.js" defer></script>
 </body></html>
