@@ -49,6 +49,35 @@ button:disabled{opacity:.58;cursor:not-allowed}
 .eligible-item span{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 .eligible-item small{font-weight:400;color:var(--muted)}
 .eligible-item:has(input:disabled){opacity:.72;cursor:default}
+
+/* Geführte Administration: acht einzeln aufklappbare Schritte */
+.guide{display:grid;gap:12px;margin:0 0 22px}
+.guide-intro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px}
+.guide-intro h2{margin:0 0 5px}
+.guide-intro p{margin:0;color:var(--muted);max-width:640px}
+.guide-progress{color:var(--muted);margin:2px 6px 4px;font-size:14px}
+.guide-step{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;scroll-margin-top:20px;box-shadow:0 1px 2px #21343a0b}
+.guide-step[open]{border-color:var(--accent);box-shadow:0 3px 14px #26373b16}
+.guide-step>summary{list-style:none;display:flex;align-items:center;gap:14px;cursor:pointer;padding:19px 22px;user-select:none}
+.guide-step>summary::-webkit-details-marker{display:none}
+.guide-step>summary:focus-visible{outline:3px solid #e5ad63;outline-offset:-4px}
+.guide-number{display:inline-flex;justify-content:center;align-items:center;width:36px;height:36px;flex:0 0 36px;border-radius:50%;background:#e9eeeb;color:var(--ink);font-weight:750}
+.guide-step[open] .guide-number{background:var(--accent);color:#fff}
+.guide-heading{display:grid;gap:4px;flex:1;min-width:0}
+.guide-heading strong{font-size:18px}
+.guide-heading small{font-size:13px;line-height:1.35}
+.guide-chevron{border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);width:9px;height:9px;transform:rotate(45deg);margin-right:8px;transition:transform .16s}
+.guide-step[open] .guide-chevron{transform:rotate(225deg)}
+.guide-content{border-top:1px solid var(--line);padding:0 22px 20px}
+.guide-container{margin:0}
+.guide-original.panel{margin:0;padding:16px 0;border:0;border-radius:0;box-shadow:none}
+.guide-original.panel>h2:first-child{display:none}
+.guide-original.tool-section{margin:0;border-top:0;padding-top:20px}
+.guide-actions{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:16px;border-top:1px solid var(--line)}
+.guide-actions button:last-child{margin-left:auto}
+#admin nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#admin nav button.guide-nav-active{box-shadow:inset 0 0 0 2px #1f3436;background:#e6eceb;color:var(--ink)}
+@media(max-width:650px){.guide-intro,.guide-step>summary{padding:16px}.guide-content{padding:0 16px 16px}.guide-heading strong{font-size:16px}.guide-intro button{width:100%}}
 </style></head>
 <body><header><div class="brand">Oberstufenzentrum Rapperswil</div><h1>Lernmodule</h1><div>Module entdecken · Wünsche planen · Schulverwaltung</div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
@@ -116,9 +145,9 @@ const {data:mods}=await db.from('modules').select('title,max_capacity');$('modul
 $('campaignForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.modules_per_student=+a.modules_per_student;a.max_preferences=+a.max_preferences;
 if(a.max_preferences<a.modules_per_student)return notice('Mindestens so viele Wünsche wie Module erforderlich.',true);
 a.starts_at=new Date(a.starts_at).toISOString();a.ends_at=new Date(a.ends_at).toISOString();
-const {error}=await db.from('campaigns').insert(a);notice(error?.message||'Entwurf gespeichert',!!error);if(!error){e.target.reset();await refresh()}};
+const {error}=await db.from('campaigns').insert(a);notice(error?.message||'Entwurf gespeichert',!!error);if(!error){e.target.reset();await refresh();window.learningGuideAdvance?.('campaign');}};
 $('moduleForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;if(!a.time_slot_id)delete a.time_slot_id;
-const {error}=await db.from('modules').insert(a);notice(error?.message||'Modul gespeichert',!!error);if(!error)await refresh()};
+const {error}=await db.from('modules').insert(a);notice(error?.message||'Modul gespeichert',!!error);if(!error){const campaignId=a.campaign_id;e.target.reset();await refresh();$('moduleCampaign').value=campaignId;window.learningGuideAdvance?.('modules');}};
 function parseCSV(text){
 text=text.replace(/^\uFEFF/,'');
 const firstLine=text.split(/\r?\n/,1)[0];
@@ -146,7 +175,7 @@ if(!rows.length||rows.some(r=>!r.external_id||!r.first_name||!r.last_name||!r.cl
 const names=[...new Set(rows.map(r=>r.class))];const {error:ce}=await db.from('classes').upsert(names.map(name=>({name})),{onConflict:'name'});if(ce)return notice(ce.message,true);
 const {data:classes,error:le}=await db.from('classes').select('id,name');if(le)return notice(le.message,true);const map=Object.fromEntries(classes.map(c=>[c.name,c.id]));
 const {error}=await db.from('students').upsert(rows.map(r=>({external_id:r.external_id,first_name:r.first_name,last_name:r.last_name,class_id:map[r.class]})),{onConflict:'external_id'});
-notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error)await refresh()};
+notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error){await refresh();window.learningGuideAdvance?.('students');}};
 catalog();check();
 </script>
 <script src="student-signup.js" defer></script>
@@ -155,4 +184,5 @@ catalog();check();
 <script src="registration-admin.js" defer></script>
 <script src="allocation-admin.js" defer></script>
 <script src="published-results.js" defer></script>
+<script src="guided-workflow.js" defer></script>
 </body></html>
