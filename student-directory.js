@@ -33,6 +33,7 @@ panel.innerHTML=
 '<option value="1">Eine Karte pro A4-Seite</option></select></label></div>'+
 '<button type="button" id="directoryPrint">PDF erstellen</button>'+
 '<button type="button" id="directoryIssue" class="secondary">Fehlende Zugangscodes erzeugen</button>'+
+'<button type="button" id="directoryReplace" class="danger">Codes für Auswahl neu ausstellen</button>'+
 '<p class="muted">Bestehende Zugangscodes werden dabei nicht geändert.</p>'+
 '<details><summary>Vorhandene Zugangscodes aus der ursprünglichen CSV übernehmen</summary>'+
 '<p class="muted">Code-CSV mit Schueler_ID und Zugangscode auswählen. Die Codes werden überprüft und verschlüsselt für spätere Druckaufträge gespeichert.</p>'+
@@ -161,6 +162,20 @@ $('directoryIssue').onclick=async()=>{
   info(created.length?created.length+' neue Codes erstellt, CSV heruntergeladen. Jetzt PDF-Druck möglich.':
    'Alle haben bereits einen Code. Für alte Codes muss ggf. die ursprüngliche CSV übernommen werden.');
  }catch(e){info(e.message,true)}finally{button.disabled=false}
+};
+$('directoryReplace').onclick=async()=>{
+ const ids=scopeIds();
+ if(!ids.length)return info('Keine Schüler ausgewählt.',true);
+ if(!confirm('ACHTUNG: Alle bestehenden Zugangscodes der ausgewählten '+ids.length+' Schüler werden sofort ungültig. Neue Karten müssen verteilt werden. Fortfahren?'))return;
+ const phrase=prompt('Zur Bestätigung exakt NEU AUSSTELLEN eingeben:');
+ if(phrase!=='NEU AUSSTELLEN')return info('Codewechsel abgebrochen.');
+ const button=$('directoryReplace');button.disabled=true;
+ try{
+  const created=await issue(ids,true);
+  await reload();
+  info(created.length+' Codes neu ausgestellt. Alte Karten sind ungültig. Die neuen Codes sind als CSV heruntergeladen. Bitte jetzt die neuen PDFs erstellen.');
+ }catch(err){info(err.message||'Codewechsel fehlgeschlagen.',true)}
+ finally{button.disabled=false}
 };
 async function readCards(ids){
  const result=[];
