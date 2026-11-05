@@ -11,20 +11,35 @@
 - Der Ansichtswechsel ist eine reine Darstellungssache. Die Datenbankrechte werden weiterhin ausschliesslich durch Authentifizierung und Row Level Security gesteuert.
 - Für einen direkten Link zum Administrator-Login kann die Adresse mit `?ansicht=admin` verwendet werden; ein bereits angemeldeter Administrator kommt standardmässig sofort in die Verwaltung.
 
-## Geführte Verwaltung (neues Bedienkonzept)
+## Administratorbereich: Ausschreibungen zuerst auswählen
 
-Die Administration ist nun als **Akkordeon mit acht Schritten** aufgebaut:
+Die bisherige Vierfach-Navigation wurde durch eine schlanke Kopfzeile mit dem Button **Ausschreibungen** ersetzt. Nach dem Login wird zunächst eine Liste aller Ausschreibungen mit **deutschen Statusbezeichnungen** angezeigt:
 
-1. Ausschreibung anlegen
-2. Module und Zeitblöcke erfassen
+- `draft` → **Entwurf**
+- `open` → **Anmeldung offen**
+- `closed` → **Anmeldung geschlossen**
+- `allocated` → **Zuteilung in Prüfung**
+- `published` → **Ergebnisse veröffentlicht**
+- `archived` → **Archiviert**
+
+Diese technischen Statuswerte bleiben in Supabase absichtlich unverändert, damit der bestehende Workflow funktioniert.
+
+Durch Anklicken einer Ausschreibung öffnet sich **nur deren** geführte Verwaltung, bestehend aus acht einzeln auf- und zuklappbaren Bereichen:
+
+1. Ausschreibung (bei Entwürfen bearbeiten oder löschen)
+2. Module und Zeitblöcke (Module hinzufügen, bearbeiten, löschen)
 3. Schüler importieren
-4. Persönliche Zugangscodes erzeugen
-5. Teilnehmende einzeln oder nach Klasse auswählen
+4. Persönliche Zugangscodes
+5. Teilnehmende auswählen
 6. Anmeldung freigeben
-7. Anmeldungen kontrollieren und bei Bedarf korrigieren
-8. Zuteilung und Resultate verwalten
+7. Anmeldungen kontrollieren
+8. Zuteilungen und Ergebnisse
 
-Nach einem erfolgreichen Schritt wird der nächste passende Abschnitt geöffnet, der vorherige eingeklappt. Bei den Modulen erfolgt dieser Wechsel erst, wenn mindestens so viele aktive Module vorhanden sind wie Wünsche verlangt werden. Jede Stufe lässt sich jederzeit über die Überschrift oder die Schaltflächen manuell öffnen, schliessen und erneut bearbeiten. Die Schaltfläche **Nächsten sinnvollen Schritt anzeigen** orientiert sich am Status der zuletzt erstellten Ausschreibung. Es werden keine Daten automatisch veröffentlicht oder zugeteilt: Dafür bleibt immer ein bewusster Admin-Klick erforderlich.
+**Löschschutz:** Ganze Ausschreibungen lassen sich nur im Status **Entwurf** löschen. Module dürfen in Entwürfen entfernt werden; in offenen Ausschreibungen nur, solange noch keine Anmeldungen existieren und nach dem Löschen weiterhin genügend Module für die geforderte Zahl an Wünschen angeboten werden. Bei laufenden Anmeldungen und abgeschlossenen Zuteilungen sind Moduländerungen gesperrt. Das Löschen eines Entwurfs erfordert zusätzlich die Bestätigung seines Namens. Die Änderung wird serverseitig geprüft und protokolliert.
+
+Die Schaltfläche **Ausschreibungen** kehrt jederzeit zur Liste zurück. Der Button **Neue Ausschreibung** startet einen neuen Entwurf. Das System setzt für alle Unterbereiche eine gemeinsame Ausschreibungs-Auswahl und vermeidet das Vermischen verschiedener Ausschreibungen.
+
+Die eingebauten Formulare behalten ihre bisherigen Funktionen. Sie werden nur in die passenden Schritte verschoben. Erfolgreiche Speicheraktionen führen weiterhin zum nächsten Schritt; jeder Bereich lässt sich jederzeit manuell öffnen. Es wird nichts automatisch veröffentlicht oder zugeteilt.
 
 ## Aktuelle Funktionen
 
