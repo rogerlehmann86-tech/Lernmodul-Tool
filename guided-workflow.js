@@ -50,8 +50,12 @@
     guide.set(step.id,details);
     bodies.set(step.id,body);
     details.addEventListener('toggle',()=>{
-      if(details.open) details.classList.add('guide-open');
-      else details.classList.remove('guide-open');
+      if(details.open) {
+        details.classList.add('guide-open');
+        for(const other of guide.values())if(other!==details)other.open=false;
+      } else {
+        details.classList.remove('guide-open');
+      }
     });
   });
 
