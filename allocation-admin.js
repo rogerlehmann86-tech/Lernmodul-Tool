@@ -16,6 +16,10 @@
     '<button type="button" id="allocationCalculate">Faire Zuteilung berechnen</button>'+
     '<button type="button" class="secondary" id="allocationLoadSaved">Gespeicherten Entwurf laden</button>'+
     '<p id="allocationNotice" role="status" aria-live="polite"></p>'+
+    '<div id="allocationApprove" class="alloc-editor" hidden><h3>Endresultate veröffentlichen</h3><p id="allocationApprovalWarning"></p>'+
+    '<label><input type="checkbox" id="allocationAllowIncomplete" style="width:auto;display:inline"> Unvollständige Zuteilung bewusst freigeben</label>'+
+    '<button type="button" id="allocationPublish">Zuteilung für Schüler freigeben</button></div>'+
+    '<div id="allocationLocks" class="alloc-editor" hidden></div>'+
     '<div id="allocationResult" hidden>'+
       '<div id="allocationSummary"></div>'+
       '<div class="alloc-scroll"><table id="allocationTable"></table></div>'+
@@ -76,6 +80,20 @@
       const ids=new Map(registrations.map(r=>[r.id,r.student_id]));
       preferred=new Map(prefs.map(p=>[ids.get(p.registration_id)+':'+p.module_id,p.rank]));
       lockedIds=new Map(assignmentRows.filter(a=>a.locked).map(a=>[a.student_id+':'+a.module_id,a.id]));
+      $('allocationApprove').hidden=c.status!=='allocated';
+      const counted=new Map();
+      for(const a of assignmentRows)counted.set(a.student_id,(counted.get(a.student_id)||0)+1);
+      const missingForPublish=registrations.reduce((n,r)=>n+Math.max(0,c.modules_per_student-(counted.get(r.student_id)||0)),0);
+      $('allocationApprovalWarning').textContent=missingForPublish?
+        'Achtung: Es fehlen '+missingForPublish+' Modulplätze. Für die Freigabe ist eine bewusste Bestätigung erforderlich.':
+        'Alle angemeldeten Schüler haben die vorgesehene Anzahl Module erhalten.';
+      $('allocationAllowIncomplete').checked=false;
+      $('allocationLocks').hidden=!(c.status==='allocated'&&lockedIds.size);
+      $('allocationLocks').innerHTML='<h3>Gesperrte Zuteilungen</h3>'+
+        assignmentRows.filter(a=>a.locked).map(a=>
+          '<p>'+esc((students.get(a.student_id)?.last_name||'')+' '+(students.get(a.student_id)?.first_name||''))+
+          ': '+esc(modules.get(a.module_id)?.title||a.module_id)+
+          ' <button type="button" class="secondary" data-unlock="'+esc(a.id)+'">Sperre lösen</button></p>').join('');
       const registered=registrations.length;
       msg('Status: '+c.status+' · '+registered+' Anmeldungen · '+assignmentRows.length+' bestehende Zuteilungen');
       $('allocationStudent').innerHTML=registrations.map(r=>students.get(r.student_id)).filter(Boolean).sort((a,b)=>a.last_name.localeCompare(b.last_name)).map(s=>
@@ -201,6 +219,31 @@
       download('lernmodule-zuteilung-'+campaign.id.slice(0,8)+'.csv',csv);
       msg('CSV exportiert. Enthält Schülerdaten – bitte geschützt aufbewahren.');
     }catch(e){msg(e.message||'Export fehlgeschlagen.',true);}
+  });
+  $('allocationLocks').addEventListener('click',async e=>{
+    const button=e.target.closest('button[data-unlock]');
+    if(!button)return;
+    if(!confirm('Diese Zuteilung entsperren? Sie kann danach bei einer Neuberechnung geändert werden.'))return;
+    button.disabled=true;
+    const {error}=await db.rpc('set_assignment_lock',{p_assignment_id:button.dataset.unlock,p_locked:false});
+    if(error){msg(error.message,true);button.disabled=false;return;}
+    await loadDetails();msg('Sperre gelöst.');
+  });
+  $('allocationPublish').addEventListener('click',async()=>{
+    if(!campaign||campaign.status!=='allocated')return msg('Zunächst einen Zuteilungsentwurf speichern.',true);
+    if(!confirm('Die Resultate sind danach für Schüler mit Zugangscode sichtbar und nicht mehr bearbeitbar. Wirklich veröffentlichen?'))return;
+    const button=$('allocationPublish');button.disabled=true;
+    try{
+      const {data,error}=await db.rpc('publish_allocation_results',{
+        p_campaign_id:campaign.id,
+        p_allow_incomplete:$('allocationAllowIncomplete').checked
+      });
+      if(error)throw error;
+      await loadCampaigns();
+      if(typeof window.reloadPublishedResults==='function')await window.reloadPublishedResults();
+      msg('Ergebnisse veröffentlicht: '+data.assigned+' Plätze, '+data.missing+' fehlend.');
+    }catch(e){msg(e.message||'Freigabe fehlgeschlagen.',true)}
+    finally{button.disabled=false;}
   });
   // Leichtgewichtig: nur in der angemeldeten Administratoransicht verwenden.
   db.auth.onAuthStateChange((event)=>{
