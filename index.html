@@ -90,6 +90,16 @@ button:disabled{opacity:.58;cursor:not-allowed}
 #auth{max-width:660px;margin:20px auto 30px}
 #admin>.panel:first-child{border-top:4px solid var(--accent)}
 @media(max-width:650px){.site-head{align-items:flex-start}.site-navigation{width:100%}.site-navigation button{flex:1}}
+
+.admin-toolbar{padding:16px 20px}
+.admin-toolbar-info{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.admin-toolbar-info strong{font-size:17px}
+.admin-toolbar-info p{margin:1px 0;color:var(--muted);font-size:13px}
+.admin-toolbar-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.admin-toolbar-actions button{margin:0}
+button.danger{background:#a73932;color:#fff}
+button.danger:hover{background:#82291f}
+#moduleList td button{margin:3px}
 </style></head>
 <body><header><div class="site-head"><div><div class="brand">Oberstufenzentrum Rapperswil</div><h1 id="siteHeading">Lernmodule</h1><div id="siteSubtitle">Module entdecken · Wünsche planen</div></div><nav class="site-navigation" aria-label="Ansichten wechseln"><button type="button" id="showStudentView" class="secondary" hidden>Schüleransicht</button><button type="button" id="showAdminView" class="secondary">Administration</button></nav></div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
@@ -117,23 +127,24 @@ button:disabled{opacity:.58;cursor:not-allowed}
 <label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
 <button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button><button type="button" id="loginLogout" class="secondary" hidden>Von diesem Konto abmelden</button>
 <p><small>Die Erstregistrierung wird erst nach E-Mail-Bestätigung freigeschaltet.</small></p></section>
-<section id="admin" class="hidden"><div class="panel"><h2>Verwaltung</h2><p id="who"></p><button id="logout" class="secondary">Abmelden</button>
-<nav><button data-view="campaign">Ausschreibungen</button><button data-view="modules">Module</button><button data-view="students">Schüler</button><button data-view="allocation">Zuteilung</button></nav></div>
-<div id="campaign" class="panel"><h2>Neue Ausschreibung</h2><form id="campaignForm">
+<section id="admin" class="hidden"><div class="panel admin-toolbar"><div class="admin-toolbar-info"><div><strong>Schulverwaltung</strong><p id="who"></p></div><button id="logout" class="secondary">Abmelden</button></div><div class="admin-toolbar-actions"><button type="button" id="chooseCampaigns">Ausschreibungen</button><span id="selectedCampaignLabel" class="muted">Bitte Ausschreibung auswählen</span></div></div>
+<div id="campaign" class="panel"><h2 id="campaignFormTitle">Neue Ausschreibung</h2><p id="campaignFormInfo" class="muted">Lege eine neue Ausschreibung als Entwurf an.</p><form id="campaignForm">
 <label>Titel<input name="title" required></label><label>Beginn<input type="datetime-local" name="starts_at" required></label>
 <label>Ende<input type="datetime-local" name="ends_at" required></label>
 <label>Module pro Schüler<input type="number" name="modules_per_student" min="1" max="20" value="1" required></label>
 <label>Anzahl Wünsche<input type="number" name="max_preferences" min="1" max="50" value="3" required></label>
-<button>Entwurf speichern</button></form><div id="campaignList"></div></div>
+<button id="campaignSave" type="submit">Entwurf speichern</button><button id="campaignCancelEdit" type="button" class="secondary" hidden>Abbrechen</button><button id="deleteCampaign" type="button" class="danger" hidden>Entwurf löschen</button></form><div id="campaignList"></div></div>
 <div id="modules" class="panel hidden"><h2>Module erfassen</h2><form id="moduleForm">
 <label>Ausschreibung<select name="campaign_id" id="moduleCampaign" required></select></label>
 <label>Titel<input name="title" required></label><label>Beschreibung<textarea name="description"></textarea></label><label>Zeitblock (optional)<select name="time_slot_id" id="moduleTimeSlot"><option value="">Kein Zeitblock</option></select></label>
 <label>Mindestplätze<input name="min_capacity" type="number" min="0" value="0" required></label>
-<label>Maximalplätze<input name="max_capacity" type="number" min="1" value="20" required></label><button>Modul speichern</button></form><div id="moduleList"></div></div>
+<label>Maximalplätze<input name="max_capacity" type="number" min="1" value="20" required></label><button id="moduleSave" type="submit">Modul speichern</button><button id="moduleCancelEdit" type="button" class="secondary" hidden>Bearbeitung abbrechen</button></form><div id="moduleList"></div></div>
 <div id="students" class="panel hidden"><h2>Schüler importieren</h2><p>CSV-Spalten: <code>external_id,first_name,last_name,class</code>. Noch keine echten Schülerdaten importieren, bis die Anwendung getestet ist.</p>
 <input id="csv" type="file" accept=".csv,text/csv"><button id="import">CSV importieren</button><p id="studentCount"></p></div><div id="allocation" class="panel hidden"></div></section>
 </main><footer>OSZ Rapperswil · Eigenständiges Lernmodul-Tool · <a href="https://schulen-rapperswil.ch/oberstufenzentrum/">Schulhomepage</a></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/dist/umd/supabase.min.js"></script><script>
+const statusNames={draft:"Entwurf",open:"Anmeldung offen",closed:"Anmeldung geschlossen",allocated:"Zuteilung in Prüfung",published:"Ergebnisse veröffentlicht",archived:"Archiviert"};
+window.learningStatusLabel=s=>statusNames[s]||s;
 const db=window.supabase.createClient('https://htqcyvhzrtrmtlqqdzly.supabase.co','sb_publishable_PtdT07j6tRnoH0Y2tFRnhw_sSqa4UnE');
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -187,17 +198,150 @@ db.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY'){const p=prompt
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
 $('loginLogout').onclick=async()=>{await db.auth.signOut();isAdminAccount=false;$('loginLogout').hidden=true;notice('Abgemeldet.');showView('student')};
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>['campaign','modules','students','allocation'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.view)));
-async function refresh(){const {data,error}=await db.from('campaigns').select('*').order('created_at',{ascending:false});if(error)return notice(error.message,true);
-$('campaignList').innerHTML='<h3>Ausschreibungen</h3><table><tr><th>Titel</th><th>Ende</th><th>Status</th></tr>'+data.map(c=>'<tr><td>'+esc(c.title)+'</td><td>'+esc(new Date(c.ends_at).toLocaleString('de-CH'))+'</td><td>'+esc(c.status)+'</td></tr>').join('')+'</table>';
-$('moduleCampaign').innerHTML=data.map(c=>'<option value="'+c.id+'">'+esc(c.title)+'</option>').join('');
-const {count}=await db.from('students').select('id',{count:'exact',head:true});$('studentCount').textContent=(count??0)+' Schüler gespeichert';
-const {data:mods}=await db.from('modules').select('title,max_capacity');$('moduleList').innerHTML=(mods||[]).map(m=>'<p>'+esc(m.title)+' – maximal '+m.max_capacity+' Plätze</p>').join('')}
-$('campaignForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.modules_per_student=+a.modules_per_student;a.max_preferences=+a.max_preferences;
-if(a.max_preferences<a.modules_per_student)return notice('Mindestens so viele Wünsche wie Module erforderlich.',true);
-a.starts_at=new Date(a.starts_at).toISOString();a.ends_at=new Date(a.ends_at).toISOString();
-const {error}=await db.from('campaigns').insert(a);notice(error?.message||'Entwurf gespeichert',!!error);if(!error){e.target.reset();await refresh();window.learningGuideAdvance?.('campaign');}};
-$('moduleForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;if(!a.time_slot_id)delete a.time_slot_id;
-const {error}=await db.from('modules').insert(a);notice(error?.message||'Modul gespeichert',!!error);if(!error){const campaignId=a.campaign_id;e.target.reset();await refresh();$('moduleCampaign').value=campaignId;window.learningGuideAdvance?.('modules');}};
+async function refresh(){
+ const {data,error}=await db.from('campaigns').select('*').order('created_at',{ascending:false});
+ if(error)return notice(error.message,true);
+ const current=window.learningCurrentCampaignId||null;
+ const selected=(data||[]).find(c=>c.id===current);
+ const previous=$('moduleCampaign').value;
+ $('moduleCampaign').innerHTML=(data||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+'</option>').join('');
+ const chosen=selected?.id||((data||[]).some(c=>c.id===previous)?previous:'');
+ if(chosen)$('moduleCampaign').value=chosen;
+ $('campaignList').innerHTML=selected?
+  '<p class="muted">Aktuelle Ausschreibung: <strong>'+esc(selected.title)+'</strong> · '+esc(window.learningStatusLabel(selected.status))+'</p>':
+  '<p class="muted">Wähle eine bestehende Ausschreibung oder erstelle einen neuen Entwurf.</p>';
+ const {count}=await db.from('students').select('id',{count:'exact',head:true});
+ $('studentCount').textContent=(count??0)+' Schüler gespeichert';
+ const cid=window.learningCurrentCampaignId||null;
+ if(!cid){$('moduleList').innerHTML='<p class="muted">Bitte zuerst eine Ausschreibung auswählen.</p>';return;}
+ const {data:mods,error:moduleError}=await db.from('modules').select('id,campaign_id,title,description,min_capacity,max_capacity,time_slot_id,active').eq('campaign_id',cid).order('title');
+ if(moduleError)return notice(moduleError.message,true);
+ const status=selected?.status;
+ const {count:registrations}=await db.from('registrations').select('id',{count:'exact',head:true}).eq('campaign_id',cid);
+ const editable=['draft','open'].includes(status)&&!registrations;
+ window.learningCurrentModuleList=mods||[];
+ $('moduleList').innerHTML='<h3>Erfasste Module ('+(mods||[]).length+')</h3>'+
+ ((mods||[]).length?
+  '<div class="alloc-scroll"><table><thead><tr><th>Modul</th><th>Plätze</th><th>Aktionen</th></tr></thead><tbody>'+
+  (mods||[]).map(m=>'<tr><td><strong>'+esc(m.title)+'</strong><div class="muted">'+
+    esc(m.description||'')+'</div></td><td>'+m.min_capacity+'–'+m.max_capacity+'</td><td>'+
+   (editable?'<button type="button" class="secondary" data-edit-module="'+esc(m.id)+'">Bearbeiten</button>'+
+    '<button type="button" class="danger" data-delete-module="'+esc(m.id)+'">Löschen</button>':
+    '<small class="muted">Nicht mehr bearbeitbar</small>')+'</td></tr>').join('')+
+  '</tbody></table></div>':'<p class="muted">Noch keine Module erfasst.</p>');
+ $('moduleForm').querySelectorAll('input,textarea,select,button').forEach(el=>{
+   if(el.id==='moduleCampaign')return;
+   el.disabled=!editable;
+ });
+ if(!editable&&window.learningEditingModuleId)window.learningEditingModuleId=null;
+}
+$('campaignForm').onsubmit=async e=>{
+ e.preventDefault();
+ const form=$('campaignForm'),a=Object.fromEntries(new FormData(form));
+ a.modules_per_student=+a.modules_per_student;a.max_preferences=+a.max_preferences;
+ if(a.max_preferences<a.modules_per_student)return notice('Mindestens so viele Wünsche wie zugeteilte Module erforderlich.',true);
+ a.starts_at=new Date(a.starts_at).toISOString();
+ a.ends_at=new Date(a.ends_at).toISOString();
+ const id=window.learningCurrentCampaignId;
+ const isEditing=!!id&&window.learningCampaignEditing===true;
+ let newId=id,err;
+ if(isEditing){
+  const r=await db.rpc('update_learning_campaign_draft',{
+   p_campaign_id:id,p_title:a.title,p_starts_at:a.starts_at,p_ends_at:a.ends_at,
+   p_modules_per_student:a.modules_per_student,p_max_preferences:a.max_preferences
+  });err=r.error;
+ }else{
+  const r=await db.from('campaigns').insert(a).select('id').single();
+  err=r.error;newId=r.data?.id;
+ }
+ if(err)return notice(err.message,true);
+ notice(isEditing?'Ausschreibung aktualisiert':'Entwurf gespeichert');
+ await refresh();
+ if(newId&&typeof window.learningChooseCampaign==='function')
+  await window.learningChooseCampaign(newId,{step:isEditing?'campaign':'modules'});
+ else window.learningGuideAdvance?.('campaign');
+};
+$('moduleForm').onsubmit=async e=>{
+ e.preventDefault();
+ const form=$('moduleForm'),a=Object.fromEntries(new FormData(form));
+ const cid=window.learningCurrentCampaignId;
+ if(!cid)return notice('Bitte zuerst eine Ausschreibung auswählen.',true);
+ a.campaign_id=cid;
+ a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;
+ if(!a.time_slot_id)delete a.time_slot_id;
+ const editId=window.learningEditingModuleId;
+ let error;
+ if(editId){
+  const response=await db.rpc('update_learning_module',{
+   p_module_id:editId,p_title:a.title,p_description:a.description||null,
+   p_min_capacity:a.min_capacity,p_max_capacity:a.max_capacity,p_time_slot_id:a.time_slot_id||null
+  });error=response.error;
+ }else{
+  const response=await db.from('modules').insert(a);error=response.error;
+ }
+ if(error)return notice(error.message,true);
+ window.learningEditingModuleId=null;
+ $('moduleSave').textContent='Modul speichern';
+ $('moduleCancelEdit').hidden=true;
+ form.reset();
+ await refresh();
+ $('moduleCampaign').value=cid;
+ if(typeof window.reloadModuleTimeSlots==='function')await window.reloadModuleTimeSlots();
+ notice(editId?'Modul aktualisiert':'Modul gespeichert');
+ if(!editId)window.learningGuideAdvance?.('modules');
+};
+$('moduleCancelEdit').onclick=()=>{
+ window.learningEditingModuleId=null;
+ $('moduleSave').textContent='Modul speichern';
+ $('moduleCancelEdit').hidden=true;
+ $('moduleForm').reset();
+ if(window.learningCurrentCampaignId)$('moduleCampaign').value=window.learningCurrentCampaignId;
+};
+$('moduleList').addEventListener('click',async e=>{
+ const edit=e.target.closest('button[data-edit-module]');
+ const del=e.target.closest('button[data-delete-module]');
+ if(!edit&&!del)return;
+ const id=(edit||del).dataset[edit?'editModule':'deleteModule'];
+ const mod=(window.learningCurrentModuleList||[]).find(m=>m.id===id);
+ if(!mod||mod.campaign_id!==window.learningCurrentCampaignId)return;
+ if(edit){
+  window.learningEditingModuleId=id;
+  const form=$('moduleForm');
+  for(const name of ['title','description','min_capacity','max_capacity']){
+   const input=form.elements.namedItem(name);
+   if(input)input.value=mod[name]??'';
+  }
+  $('moduleCampaign').value=mod.campaign_id;
+  if(typeof window.reloadModuleTimeSlots==='function')await window.reloadModuleTimeSlots();
+  $('moduleTimeSlot').value=mod.time_slot_id||'';
+  $('moduleSave').textContent='Änderungen speichern';
+  $('moduleCancelEdit').hidden=false;
+  form.scrollIntoView({behavior:'smooth',block:'center'});
+  return;
+ }
+ if(!confirm('Modul «'+mod.title+'» wirklich löschen? Dies kann nicht rückgängig gemacht werden.'))return;
+ del.disabled=true;
+ const {error}=await db.rpc('delete_learning_module',{p_module_id:id});
+ if(error){del.disabled=false;return notice(error.message,true);}
+ window.learningEditingModuleId=null;
+ $('moduleSave').textContent='Modul speichern';$('moduleCancelEdit').hidden=true;
+ await refresh();notice('Modul gelöscht');
+});
+$('deleteCampaign').onclick=async()=>{
+ const id=window.learningCurrentCampaignId;
+ if(!id||!window.learningCampaignEditing)return;
+ const title=$('campaignForm').elements.namedItem('title').value.trim();
+ if(!confirm('Entwurf «'+title+'» mitsamt Modulen und Zuordnungen endgültig löschen?'))return;
+ const entered=prompt('Zur Bestätigung den Namen der Ausschreibung eingeben:');
+ if(entered!==title)return notice('Löschen abgebrochen.');
+ const button=$('deleteCampaign');button.disabled=true;
+ const {error}=await db.rpc('delete_learning_campaign_draft',{p_campaign_id:id});
+ button.disabled=false;
+ if(error)return notice(error.message,true);
+ notice('Entwurf gelöscht');
+ if(typeof window.learningOpenCampaignOverview==='function')await window.learningOpenCampaignOverview();
+};
+$('campaignCancelEdit').onclick=()=>window.learningOpenCampaignOverview?.();
 function parseCSV(text){
 text=text.replace(/^\uFEFF/,'');
 const firstLine=text.split(/\r?\n/,1)[0];
