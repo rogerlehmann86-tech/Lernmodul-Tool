@@ -97,7 +97,7 @@ Zum Beispiel `external_id;first_name;last_name;class`. Deutsche Überschriften w
 
 ## Gestaltung
 
-Layout ist derzeit an das Oberstufenzentrum Rapperswil angelehnt. Das offizielle Schullogo und die exakten Corporate-Design-Farbwerte wurden noch nicht aus autorisierten Gestaltungsdateien übernommen.
+Die Farbgestaltung orientiert sich jetzt an einem Screenshot der Schulhomepage: Himmelblau `#C8E6EB`, Kachelgrün `#DEF1DD`, Logo-Grün `#519C62` und Lindgrün `#8CCB80`. Für Bedienelemente mit weisser Schrift verwenden wir aus Lesbarkeitsgründen ein dunkleres Grün (`#347548`). Die Farbwerte wurden dem Screenshot entnommen; ein offizielles Corporate-Design-Handbuch oder das originale Schullogo wurden dafür nicht verwendet.
 
 ## Weitere mögliche Ausbaustufen
 
