@@ -54,10 +54,10 @@
     throw Error('Zu viele Datensätze. Bitte Schulverwaltung kontaktieren.');
   }
   async function loadCampaigns(){
-    const old=selector.value;
+    const old=window.learningCurrentCampaignId||selector.value;
     const {data,error}=await db.from('campaigns').select('id,title,status,ends_at,modules_per_student,max_preferences').order('created_at',{ascending:false});
     if(error){msg(error.message,true);return;}
-    selector.innerHTML=(data||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(c.status)+')</option>').join('');
+    selector.innerHTML=(data||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.title)+' ('+esc(window.learningStatusLabel(c.status))+')</option>').join('');
     if((data||[]).some(c=>c.id===old))selector.value=old;
     await loadDetails();
   }
@@ -95,7 +95,7 @@
           ': '+esc(modules.get(a.module_id)?.title||a.module_id)+
           ' <button type="button" class="secondary" data-unlock="'+esc(a.id)+'">Sperre lösen</button></p>').join('');
       const registered=registrations.length;
-      msg('Status: '+c.status+' · '+registered+' Anmeldungen · '+assignmentRows.length+' bestehende Zuteilungen');
+      msg('Status: '+window.learningStatusLabel(c.status)+' · '+registered+' Anmeldungen · '+assignmentRows.length+' bestehende Zuteilungen');
       $('allocationStudent').innerHTML=registrations.map(r=>students.get(r.student_id)).filter(Boolean).sort((a,b)=>a.last_name.localeCompare(b.last_name)).map(s=>
         '<option value="'+esc(s.id)+'">'+esc(s.last_name+' '+s.first_name+' ('+s.external_id+')')+'</option>').join('');
       $('allocationModule').innerHTML=[...modules.values()].map(m=>'<option value="'+esc(m.id)+'">'+esc(m.title)+'</option>').join('');
