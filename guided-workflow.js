@@ -156,6 +156,7 @@
       ).join('')+'</div>':'<p class="muted">Noch keine Ausschreibungen vorhanden. Du kannst jetzt einen neuen Entwurf anlegen.</p>';
   }
   async function overview(){
+    window.learningCloseStudentDirectory?.();
     operationSerial++;
     selectedId=null;selectedCampaign=null;
     window.learningCurrentCampaignId=null;
@@ -167,6 +168,7 @@
   }
   window.learningOpenCampaignOverview=overview;
   function selectNew(){
+    window.learningCloseStudentDirectory?.();
     operationSerial++;
     selectedId=null;selectedCampaign=null;
     window.learningCurrentCampaignId=null;
@@ -183,6 +185,7 @@
   }
   window.learningChooseNewCampaign=selectNew;
   async function choose(id,{step=null}={}){
+    window.learningCloseStudentDirectory?.();
     if(!id)return overview();
     const request=++operationSerial;
     const {data,error}=await db.from('campaigns').select('*').eq('id',id).single();
