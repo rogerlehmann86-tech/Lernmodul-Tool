@@ -36,6 +36,7 @@
     if(error)return msg(error.message,true);
     e.target.reset();await load();msg('Zeitblock gespeichert.');
   });
+  window.reloadModuleTimeSlots=load;
   const original=window.refresh;
   if(typeof original==='function')window.refresh=async(...args)=>{await original(...args);await load();};
   db.auth.onAuthStateChange(event=>{if(event==='SIGNED_IN')setTimeout(load,500)});
