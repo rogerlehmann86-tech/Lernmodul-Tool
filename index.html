@@ -246,7 +246,10 @@ async function refresh(){
   (mods||[]).map(m=>'<tr><td><strong>'+esc(m.title)+'</strong><div class="muted">'+
     esc(m.description||'')+'</div></td><td>'+m.min_capacity+'–'+m.max_capacity+'</td><td>'+
    (editable?'<button type="button" class="secondary" data-edit-module="'+esc(m.id)+'">Bearbeiten</button>'+
-    '<button type="button" class="danger" data-delete-module="'+esc(m.id)+'">Löschen</button>':
+    '<button type="button" class="danger" data-delete-module="'+esc(m.id)+'"'+
+      ((status==='open'&&m.active&&(mods||[]).filter(x=>x.active).length<=selected.max_preferences)?
+       ' disabled title="Mindestens '+selected.max_preferences+' Module für die Wünsche erforderlich"':'')+
+      '>Löschen</button>':
     '<small class="muted">Nicht mehr bearbeitbar</small>')+'</td></tr>').join('')+
   '</tbody></table></div>':'<p class="muted">Noch keine Module erfasst.</p>');
  $('moduleForm').querySelectorAll('input,textarea,select,button').forEach(el=>{
@@ -392,11 +395,11 @@ const {error}=await db.from('students').upsert(rows.map(r=>({external_id:r.exter
 notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error){await refresh();window.learningGuideAdvance?.('students');}};
 catalog();check();
 </script>
-<script src="student-signup.js" defer></script>
-<script src="admin-tools.js" defer></script>
-<script src="time-slot-admin.js" defer></script>
-<script src="registration-admin.js" defer></script>
-<script src="allocation-admin.js" defer></script>
-<script src="published-results.js" defer></script>
-<script src="guided-workflow.js" defer></script>
+<script src="student-signup.js?v=20261105-verwaltung" defer></script>
+<script src="admin-tools.js?v=20261105-verwaltung" defer></script>
+<script src="time-slot-admin.js?v=20261105-verwaltung" defer></script>
+<script src="registration-admin.js?v=20261105-verwaltung" defer></script>
+<script src="allocation-admin.js?v=20261105-verwaltung" defer></script>
+<script src="published-results.js?v=20261105-verwaltung" defer></script>
+<script src="guided-workflow.js?v=20261105-verwaltung" defer></script>
 </body></html>
