@@ -94,8 +94,28 @@ a.starts_at=new Date(a.starts_at).toISOString();a.ends_at=new Date(a.ends_at).to
 const {error}=await db.from('campaigns').insert(a);notice(error?.message||'Entwurf gespeichert',!!error);if(!error){e.target.reset();await refresh()}};
 $('moduleForm').onsubmit=async e=>{e.preventDefault();const a=Object.fromEntries(new FormData(e.target));a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;
 const {error}=await db.from('modules').insert(a);notice(error?.message||'Modul gespeichert',!!error);if(!error)await refresh()};
-function parseCSV(t){const lines=t.replace(/^\uFEFF/,'').trim().split(/\r?\n/);const sep=lines[0].includes(';')?';':',';const headers=lines.shift().split(sep).map(x=>x.trim());
-return lines.filter(Boolean).map(line=>Object.fromEntries(line.split(sep).map((v,i)=>[headers[i],v.trim().replace(/^"|"$/g,'')])))}
+function parseCSV(text){
+text=text.replace(/^\uFEFF/,'');
+const firstLine=text.split(/\r?\n/,1)[0];
+const delim=[';',',','\t'].sort((a,b)=>firstLine.split(b).length-firstLine.split(a).length)[0];
+const parsed=[];let row=[],item='',quoted=false;
+for(let i=0;i<text.length;i++){
+const ch=text[i];
+if(ch==='"'){if(quoted&&text[i+1]==='"'){item+='"';i++}else quoted=!quoted;}
+else if(ch===delim&&!quoted){row.push(item.trim());item='';}
+else if((ch==='\n'||ch==='\r')&&!quoted){
+if(ch==='\r'&&text[i+1]==='\n')i++;
+row.push(item.trim());if(row.some(Boolean))parsed.push(row);
+row=[];item='';
+}else item+=ch;
+}
+if(quoted)throw Error('Nicht geschlossene Anführungszeichen in CSV.');
+row.push(item.trim());if(row.some(Boolean))parsed.push(row);
+if(!parsed.length)return[];
+const known={id:'external_id',schueler_id:'external_id',schuelernummer:'external_id',schuelerid:'external_id',external_id:'external_id',vorname:'first_name',first_name:'first_name',nachname:'last_name',name:'last_name',last_name:'last_name',klasse:'class',class:'class'};
+const headers=parsed.shift().map(s=>known[s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_]/g,'_')]||s);
+return parsed.map(values=>Object.fromEntries(headers.map((h,i)=>[h,values[i]??''])));
+}
 $('import').onclick=async()=>{const file=$('csv').files[0];if(!file)return notice('CSV auswählen',true);const rows=parseCSV(await file.text());
 if(!rows.length||rows.some(r=>!r.external_id||!r.first_name||!r.last_name||!r.class))return notice('Benötigt external_id,first_name,last_name,class',true);
 const names=[...new Set(rows.map(r=>r.class))];const {error:ce}=await db.from('classes').upsert(names.map(name=>({name})),{onConflict:'name'});if(ce)return notice(ce.message,true);
