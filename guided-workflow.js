@@ -69,6 +69,222 @@
       if(details.open)for(const other of detailsMap.values())if(other!==details)other.open=false;
     });
   });
+
+  /* Einheitliche Fehlermeldungen direkt im jeweiligen Arbeitsschritt. */
+  const names={
+    title:'Titel',starts_at:'Beginn',ends_at:'Ende',
+    modules_per_student:'Module pro Schüler',max_preferences:'Anzahl Wünsche',
+    campaign_id:'Ausschreibung',description:'Beschreibung',
+    min_capacity:'Mindestplätze',max_capacity:'Maximalplätze',
+    time_slot_id:'Zeitblock'
+  };
+  function formOfStep(step){
+    return step==='campaign'?$('campaignForm'):step==='modules'?$('moduleForm'):null;
+  }
+  function stepOfForm(form){
+    return form?.closest('.guide-step')?.dataset.step||
+      (form?.id==='campaignForm'?'campaign':form?.id==='moduleForm'||form?.id==='slotForm'?'modules':null);
+  }
+  function fieldName(field){
+    return names[field.name]||field.closest('label')?.firstChild?.textContent?.trim()||field.name||'Eingabe';
+  }
+  function feedback(field){
+    const v=field.validity;
+    if(v.valueMissing)return fieldName(field)+': Bitte ausfüllen.';
+    if(v.rangeUnderflow)return fieldName(field)+': Mindestens '+field.min+' eingeben.';
+    if(v.rangeOverflow)return fieldName(field)+': Höchstens '+field.max+' eingeben.';
+    if(v.badInput||v.typeMismatch||v.stepMismatch||v.patternMismatch)
+      return fieldName(field)+': Bitte einen gültigen Wert eingeben.';
+    return fieldName(field)+': '+(field.validationMessage||'Bitte Eingabe überprüfen.');
+  }
+  function clearError(step){
+    const elem=detailsMap.get(step);
+    if(!elem)return;
+    elem.classList.remove('guide-has-error');
+    const msg=elem.querySelector('.guide-error-summary');
+    if(msg){msg.textContent='';msg.hidden=true;}
+    elem.querySelectorAll('.guide-invalid-field').forEach(field=>{
+      field.classList.remove('guide-invalid-field');
+      field.removeAttribute('aria-invalid');
+      field.removeAttribute('aria-describedby');
+    });
+    elem.querySelectorAll('.guide-field-error').forEach(node=>node.remove());
+    const status=elem.querySelector('.guide-status-error');
+    if(status)status.hidden=true;
+  }
+  function reportError(step,text,issues=[]){
+    const elem=detailsMap.get(step);
+    if(!elem)return;
+    clearError(step);
+    elem.classList.add('guide-has-error');
+    let summary=elem.querySelector('.guide-error-summary');
+    if(!summary){
+      summary=document.createElement('div');
+      summary.className='guide-error-summary';
+      summary.setAttribute('role','alert');
+      summary.setAttribute('aria-live','assertive');
+      innerMap.get(step).prepend(summary);
+    }
+    summary.textContent=text||'Bitte die markierten Angaben prüfen.';
+    summary.hidden=false;
+    let tag=elem.querySelector('.guide-status-error');
+    if(!tag){
+      tag=document.createElement('span');
+      tag.className='guide-status-error';
+      tag.textContent='Bitte prüfen';
+      elem.querySelector('.guide-heading').appendChild(tag);
+    }
+    tag.hidden=false;
+    for(const item of issues){
+      const field=item.field;
+      if(!(field instanceof HTMLElement))continue;
+      field.classList.add('guide-invalid-field');
+      field.setAttribute('aria-invalid','true');
+      const id='guide-error-'+step+'-'+String(field.name||'value').replace(/[^a-z0-9_-]/gi,'');
+      const small=document.createElement('small');
+      small.id=id;small.className='guide-field-error';
+      small.textContent=item.message;
+      field.setAttribute('aria-describedby',id);
+      field.insertAdjacentElement('afterend',small);
+    }
+  }
+  function validateForm(form,{focus=true}={}){
+    const step=stepOfForm(form);
+    if(!step)return true;
+    const issues=[];
+    for(const field of [...form.elements]){
+      if(!(field instanceof HTMLElement)||!field.willValidate||field.disabled)continue;
+      if(!field.validity.valid)issues.push({field,message:feedback(field)});
+    }
+    function add(fieldName,message){
+      const field=form.elements.namedItem(fieldName);
+      if(field instanceof HTMLElement&&!issues.some(x=>x.field===field))issues.push({field,message});
+    }
+    if(form.id==='campaignForm'){
+      const title=form.elements.namedItem('title');
+      if(title?.value.trim()==='')add('title','Bitte einen Titel für die Ausschreibung eingeben.');
+      const start=form.elements.namedItem('starts_at')?.value;
+      const end=form.elements.namedItem('ends_at')?.value;
+      if(start&&end&&new Date(end).getTime()<=new Date(start).getTime())
+        add('ends_at','Das Ende muss nach dem Beginn liegen.');
+      const wish=Number(form.elements.namedItem('max_preferences')?.value);
+      const count=Number(form.elements.namedItem('modules_per_student')?.value);
+      if(wish<count)add('max_preferences','Mindestens so viele Wünsche wie Module pro Schüler angeben.');
+    }
+    if(form.id==='moduleForm'){
+      const min=Number(form.elements.namedItem('min_capacity')?.value);
+      const max=Number(form.elements.namedItem('max_capacity')?.value);
+      if(Number.isFinite(min)&&Number.isFinite(max)&&max<min)
+        add('max_capacity','Die Maximalplätze dürfen nicht kleiner als die Mindestplätze sein.');
+    }
+    if(issues.length){
+      reportError(step,'Bitte korrigiere die rot markierten Felder, bevor du diesen Schritt speicherst.',issues);
+      if(focus){
+        const detail=detailsMap.get(step);
+        if(detail)detail.open=true;
+        issues[0].field.focus();
+      }
+      return false;
+    }
+    clearError(step);
+    return true;
+  }
+  window.learningGuideReportError=reportError;
+  window.learningGuideClearError=clearError;
+  window.learningGuideValidateForm=validateForm;
+  guide.addEventListener('input',event=>{
+    const form=event.target.closest('form');
+    const step=stepOfForm(form);
+    if(step&&form&&detailsMap.get(step)?.classList.contains('guide-has-error')){
+      // Rot bleibt bestehen, bis auch die übrigen Felder stimmen.
+      validateForm(form,{focus:false});
+    }
+  });
+  guide.addEventListener('change',event=>{
+    const form=event.target.closest('form');
+    const step=stepOfForm(form);
+    if(step&&form&&detailsMap.get(step)?.classList.contains('guide-has-error'))
+      validateForm(form,{focus:false});
+  });
+  function rememberForm(form){
+    if(form)form.dataset.guideSnapshot=JSON.stringify([...new FormData(form).entries()]);
+  }
+  function isFormDirty(form){
+    return !!form?.dataset.guideSnapshot&&
+      form.dataset.guideSnapshot!==JSON.stringify([...new FormData(form).entries()]);
+  }
+  async function mayProceedFrom(step){
+    const campaignId=selectedId;
+    if(step==='campaign'){
+      const form=$('campaignForm');
+      if(!campaignId){
+        if(!validateForm(form))return false;
+        reportError('campaign','Alle Angaben sind ausgefüllt. Bitte zuerst «Entwurf erstellen» klicken, damit die Ausschreibung gespeichert wird.');
+        return false;
+      }
+      if(selectedCampaign?.status==='draft'&&!form.hidden&&isFormDirty(form)){
+        if(!validateForm(form))return false;
+        reportError('campaign','Es gibt ungespeicherte Änderungen. Bitte zuerst «Änderungen speichern» klicken.');
+        return false;
+      }
+      return true;
+    }
+    if(!campaignId)return false;
+    if(step==='modules'){
+      if(window.learningEditingModuleId){
+        reportError('modules','Du bearbeitest gerade ein Modul. Bitte zuerst speichern oder die Bearbeitung abbrechen.');
+        return false;
+      }
+      const {data,error}=await db.from('campaigns').select('max_preferences').eq('id',campaignId).single();
+      if(error){reportError('modules',error.message);return false;}
+      const n=await count('modules',q=>q.eq('campaign_id',campaignId).eq('active',true));
+      if(n<data.max_preferences){
+        reportError('modules','Noch '+(data.max_preferences-n)+' aktive Module erfassen. Für '+
+          data.max_preferences+' Wünsche braucht es mindestens ebenso viele auswählbare Module.');
+        return false;
+      }
+      return true;
+    }
+    if(step==='students'){
+      const n=await count('students',q=>q.eq('active',true));
+      if(n===0){
+        reportError('students','Es sind noch keine aktiven Schüler erfasst. Öffne die Schülerdatenbank und importiere zuerst eine Klasse oder erfasse einzelne Schüler.');
+        return false;
+      }
+      return true;
+    }
+    if(step==='codes'){
+      const {count:n,error}=await db.from('student_access_codes')
+        .select('student_id,students!inner(active)',{count:'exact',head:true})
+        .eq('students.active',true);
+      if(error){reportError('codes',error.message);return false;}
+      const students=await count('students',q=>q.eq('active',true));
+      if((n??0)<students){
+        reportError('codes','Es fehlen Zugangscodes für '+(students-(n??0))+' aktive Schüler. Bitte zuerst Codes ausstellen.');
+        return false;
+      }
+      return true;
+    }
+    if(step==='eligibility'){
+      const n=await count('campaign_students',q=>q.eq('campaign_id',campaignId));
+      if(n===0){
+        reportError('eligibility','Für diese Ausschreibung wurde noch kein Schüler zugelassen. Bitte zuerst die Teilnehmenden auswählen und speichern.');
+        return false;
+      }
+      return true;
+    }
+    if(step==='publish'){
+      const {data,error}=await db.from('campaigns').select('status').eq('id',campaignId).single();
+      if(error){reportError('publish',error.message);return false;}
+      if(data.status==='draft'){
+        reportError('publish','Die Ausschreibung ist noch im Status «Entwurf». Bitte die Anmeldung zuerst freigeben.');
+        return false;
+      }
+      return true;
+    }
+    return true;
+  }
+
   // DOM-Knoten behalten ihre bestehenden Listener und Berechtigungen.
   for(const key of ['campaign','modules','allocation']){
     const el=$(key);
@@ -84,6 +300,16 @@
   }
   studentPanel.classList.remove('hidden');studentPanel.classList.add('guide-original');
   innerMap.get('students').appendChild(studentPanel);
+
+  for(const form of guide.querySelectorAll('form')){
+    form.noValidate=true;
+    form.addEventListener('submit',event=>{
+      if(!validateForm(form)){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },true);
+  }
 
   // Jede Ausschreibung wird nur über die gemeinsame Auswahl gesteuert.
   let selectedId=null,selectedCampaign=null,operationSerial=0;
@@ -117,6 +343,8 @@
       $('deleteCampaign').hidden=true;
       $('campaignCancelEdit').hidden=true;
       window.learningCampaignEditing=false;
+      rememberForm(form);
+      clearError('campaign');
       return;
     }
     title.textContent=selectedCampaign.status==='draft'?'Ausschreibung bearbeiten':'Ausschreibung im Überblick';
@@ -139,6 +367,8 @@
       form.elements.namedItem('starts_at').value=dateValue(selectedCampaign.starts_at);
       form.elements.namedItem('ends_at').value=dateValue(selectedCampaign.ends_at);
     }
+    rememberForm(form);
+    clearError('campaign');
   }
   function resetModuleForm(){
     window.learningEditingModuleId=null;
@@ -394,9 +624,21 @@
     const button=event.target.closest('[data-select-campaign]');
     if(button)choose(button.dataset.selectCampaign).catch(err=>alert(err.message));
   });
-  guide.addEventListener('click',event=>{
+  guide.addEventListener('click',async event=>{
     const button=event.target.closest('[data-guide-nav]');
-    if(button)openStep(button.dataset.guideNav,true);
+    if(!button)return;
+    button.disabled=true;
+    try{
+      const from=button.closest('.guide-step')?.dataset.step;
+      if(button.dataset.guideNav===steps[steps.findIndex(s=>s.id===from)+1]?.id){
+        const ready=await mayProceedFrom(from);
+        if(!ready)return;
+      }
+      openStep(button.dataset.guideNav,true);
+    }catch(err){
+      const from=button.closest('.guide-step')?.dataset.step;
+      if(from)reportError(from,err?.message||'Der nächste Schritt konnte nicht geprüft werden.');
+    }finally{button.disabled=false;}
   });
   $('guideSuggested').addEventListener('click',()=>{
     suggest().catch(err=>$('guideProgress').textContent=err.message);
@@ -412,10 +654,13 @@
       const {data}=await db.from('campaigns').select('max_preferences').eq('id',selectedId).single();
       const n=await count('modules',q=>q.eq('campaign_id',selectedId).eq('active',true));
       if(data&&n<data.max_preferences){
-        $('guideProgress').textContent='Noch '+(data.max_preferences-n)+
+        const missing=data.max_preferences-n;
+        $('guideProgress').textContent='Noch '+missing+
           ' Modul(e) erfassen, damit alle Wünsche möglich sind.';
+        reportError('modules','Noch '+missing+' aktive Module erfassen, bevor du mit den Schülern fortfahren kannst.');
         return;
       }
+      clearError('modules');
     }
     if(next){
       openStep(next,true);
