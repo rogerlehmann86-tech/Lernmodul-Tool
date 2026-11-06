@@ -23,6 +23,25 @@
     '<p class="muted">Wähle eine Ausschreibung zum Bearbeiten oder erstelle eine neue.</p></div>'+
     '<button id="newCampaign" type="button">Neue Ausschreibung</button></div>'+
     '<div id="campaignCards"></div>';
+
+  chooser.insertAdjacentHTML('beforeend',
+    '<dialog id="campaignDeleteDialog" class="campaign-delete-dialog" aria-labelledby="campaignDeleteTitle">'+
+    '<div class="delete-dialog-head"><h3 id="campaignDeleteTitle">Ausschreibung löschen</h3>'+
+    '<button type="button" class="secondary" id="campaignDeleteClose" aria-label="Schliessen">Abbrechen</button></div>'+
+    '<div id="campaignDeleteStepOne">'+
+    '<p><strong>Schritt 1 von 2 – Löschung prüfen</strong></p>'+
+    '<p>Die Ausschreibung <strong id="campaignDeleteName"></strong> und ihre Module, Zeitblöcke und Teilnahmefreigaben werden endgültig entfernt.</p>'+
+    '<p id="campaignDeleteStatistics" class="muted" role="status"></p>'+
+    '<p class="delete-warning">Schülerdaten und persönliche Zugangscodes bleiben erhalten. Ausschreibungen mit Anmeldungen oder Zuteilungen können nicht gelöscht werden.</p>'+
+    '<button type="button" id="campaignDeleteNext" class="danger">Weiter zur Sicherheitsbestätigung</button></div>'+
+    '<div id="campaignDeleteStepTwo" hidden>'+
+    '<p><strong>Schritt 2 von 2 – Endgültige Bestätigung</strong></p>'+
+    '<p>Gib den vollständigen Namen der Ausschreibung exakt ein. Erst danach wird die Schaltfläche zum endgültigen Löschen freigegeben.</p>'+
+    '<label>Ausschreibungsname zur Bestätigung<input type="text" id="campaignDeleteTyped" autocomplete="off" spellcheck="false"></label>'+
+    '<button type="button" id="campaignDeleteBack" class="secondary">Zurück</button>'+
+    '<button type="button" id="campaignDeleteCommit" class="danger" disabled>Endgültig löschen</button></div>'+
+    '<p id="campaignDeleteMessage" role="alert" class="delete-dialog-error"></p></dialog>');
+
   bar.insertAdjacentElement('afterend',chooser);
   const guide=document.createElement('section');
   guide.id='learningGuide';guide.className='guide';guide.hidden=true;
@@ -142,19 +161,139 @@
       }
     }
   }
+  let campaignRows=[];
+  let deleteCandidate=null;
   async function listCampaigns(){
-    const {data,error}=await db.from('campaigns').select('id,title,status,starts_at,ends_at,created_at')
+    const {data,error}=await db.from('campaigns')
+      .select('id,title,status,starts_at,ends_at,created_at')
       .order('created_at',{ascending:false});
     if(error)throw error;
-    $('campaignCards').innerHTML=data?.length?
-      '<div class="campaign-card-list">'+data.map(c=>
-        '<button type="button" class="campaign-card" data-select-campaign="'+esc(c.id)+'">'+
-        '<span class="campaign-card-main"><strong>'+esc(c.title)+'</strong><small>'+
-        new Date(c.starts_at).toLocaleDateString('de-CH')+' – '+new Date(c.ends_at).toLocaleDateString('de-CH')+
-        '</small></span><span class="campaign-status">'+esc(window.learningStatusLabel(c.status))+
-        '</span><span aria-hidden="true">›</span></button>'
-      ).join('')+'</div>':'<p class="muted">Noch keine Ausschreibungen vorhanden. Du kannst jetzt einen neuen Entwurf anlegen.</p>';
+    campaignRows=data||[];
+    $('campaignCards').innerHTML=campaignRows.length?
+      '<div class="campaign-card-list">'+campaignRows.map(c=>{
+        const deletable=['draft','open'].includes(c.status);
+        return '<div class="campaign-card-row">'+
+          '<button type="button" class="campaign-card" data-select-campaign="'+esc(c.id)+'">'+
+          '<span class="campaign-card-main"><strong>'+esc(c.title)+'</strong><small>'+
+          new Date(c.starts_at).toLocaleDateString('de-CH')+' – '+
+          new Date(c.ends_at).toLocaleDateString('de-CH')+
+          '</small></span><span class="campaign-status">'+esc(window.learningStatusLabel(c.status))+
+          '</span><span aria-hidden="true">›</span></button>'+
+          (deletable?'<button type="button" class="danger campaign-delete-button" data-delete-campaign="'+esc(c.id)+'" aria-label="Ausschreibung '+esc(c.title)+' löschen">Löschen</button>':
+          '<span class="campaign-delete-locked" title="Bereits abgeschlossene oder zugeteilte Ausschreibungen können nicht gelöscht werden.">Geschützt</span>')+
+          '</div>';
+      }).join('')+'</div>':
+      '<p class="muted">Noch keine Ausschreibungen vorhanden. Du kannst jetzt einen neuen Entwurf anlegen.</p>';
   }
+  function deleteMessage(message,error=false){
+    const text=$('campaignDeleteMessage');
+    text.textContent=message||'';
+    text.style.color=error?'#a02b28':'var(--muted)';
+  }
+  function closeDeleteDialog(){
+    const dialog=$('campaignDeleteDialog');
+    if(dialog.open)dialog.close();
+    deleteCandidate=null;
+    $('campaignDeleteTyped').value='';
+    $('campaignDeleteCommit').disabled=true;
+    deleteMessage('');
+  }
+  async function openDeleteDialog(id){
+    const candidate=campaignRows.find(c=>c.id===id);
+    if(!candidate)return;
+    deleteCandidate=null;
+    const dialog=$('campaignDeleteDialog');
+    $('campaignDeleteStepOne').hidden=false;
+    $('campaignDeleteStepTwo').hidden=true;
+    $('campaignDeleteNext').disabled=true;
+    $('campaignDeleteTyped').value='';
+    $('campaignDeleteCommit').disabled=true;
+    $('campaignDeleteName').textContent=candidate.title;
+    $('campaignDeleteStatistics').textContent='Ausschreibung und Auswirkungen werden geprüft …';
+    deleteMessage('');
+    if(!dialog.open)dialog.showModal();
+    const checks=await Promise.all([
+      db.from('campaigns').select('id,title,status').eq('id',id).maybeSingle(),
+      db.from('modules').select('*',{count:'exact',head:true}).eq('campaign_id',id),
+      db.from('campaign_students').select('*',{count:'exact',head:true}).eq('campaign_id',id),
+      db.from('registrations').select('*',{count:'exact',head:true}).eq('campaign_id',id),
+      db.from('assignments').select('*',{count:'exact',head:true}).eq('campaign_id',id),
+      db.from('allocation_runs').select('*',{count:'exact',head:true}).eq('campaign_id',id)
+    ]);
+    if(!dialog.open)return;
+    const error=checks.find(r=>r.error)?.error;
+    if(error){$('campaignDeleteStatistics').textContent='Prüfung nicht möglich.';return deleteMessage(error.message,true);}
+    const fresh=checks[0].data;
+    if(!fresh||fresh.title!==candidate.title||!['draft','open'].includes(fresh.status)){
+      $('campaignDeleteStatistics').textContent='Die Ausschreibung wurde zwischenzeitlich geändert.';
+      return deleteMessage('Bitte die Übersicht aktualisieren und erneut prüfen.',true);
+    }
+    const modules=checks[1].count??0;
+    const allowed=checks[2].count??0;
+    const registered=checks[3].count??0;
+    const assigned=checks[4].count??0;
+    const runs=checks[5].count??0;
+    $('campaignDeleteStatistics').textContent=
+      window.learningStatusLabel(fresh.status)+' · '+modules+' Module · '+allowed+
+      ' zugelassene Schüler · '+registered+' Anmeldungen · '+assigned+' Zuteilungen';
+    if(registered||assigned||runs){
+      return deleteMessage('Löschung gesperrt: Es liegen bereits Anmeldungen oder Zuteilungsberechnungen vor.',true);
+    }
+    deleteCandidate={id,title:fresh.title};
+    $('campaignDeleteNext').disabled=false;
+  }
+  $('campaignDeleteClose').addEventListener('click',closeDeleteDialog);
+  $('campaignDeleteDialog').addEventListener('close',()=>{
+    deleteCandidate=null;
+    $('campaignDeleteTyped').value='';
+    $('campaignDeleteCommit').disabled=true;
+  });
+  $('campaignDeleteNext').addEventListener('click',()=>{
+    if(!deleteCandidate)return;
+    $('campaignDeleteStepOne').hidden=true;
+    $('campaignDeleteStepTwo').hidden=false;
+    $('campaignDeleteTyped').focus();
+  });
+  $('campaignDeleteBack').addEventListener('click',()=>{
+    $('campaignDeleteStepTwo').hidden=true;
+    $('campaignDeleteStepOne').hidden=false;
+    $('campaignDeleteTyped').value='';
+    $('campaignDeleteCommit').disabled=true;
+    deleteMessage('');
+  });
+  $('campaignDeleteTyped').addEventListener('input',()=>{
+    $('campaignDeleteCommit').disabled=
+      !deleteCandidate||$('campaignDeleteTyped').value!==deleteCandidate.title;
+  });
+  $('campaignDeleteCommit').addEventListener('click',async()=>{
+    if(!deleteCandidate||$('campaignDeleteTyped').value!==deleteCandidate.title)return;
+    const candidate={...deleteCandidate};
+    const button=$('campaignDeleteCommit');
+    button.disabled=true;
+    $('campaignDeleteClose').disabled=true;
+    $('campaignDeleteBack').disabled=true;
+    deleteMessage('Ausschreibung wird gelöscht …');
+    try{
+      const {data,error}=await db.rpc('delete_unused_learning_campaign',{
+        p_campaign_id:candidate.id,
+        p_confirmation_title:candidate.title
+      });
+      if(error)throw error;
+      if(data!==true)throw Error('Die Datenbank hat die Löschung nicht bestätigt.');
+      closeDeleteDialog();
+      await overview();
+      const notice=document.getElementById('notice');
+      if(notice){notice.textContent='Ausschreibung «'+candidate.title+'» wurde gelöscht.';notice.style.color='#24664e';}
+    }catch(error){
+      deleteMessage(error.message||'Ausschreibung konnte nicht gelöscht werden.',true);
+    }finally{
+      $('campaignDeleteClose').disabled=false;
+      $('campaignDeleteBack').disabled=false;
+      // Only re-enable after typing the exact title; server always checks again.
+      $('campaignDeleteCommit').disabled=
+        !deleteCandidate||$('campaignDeleteTyped').value!==deleteCandidate.title;
+    }
+  });
   async function overview(){
     window.learningCloseStudentDirectory?.();
     operationSerial++;
@@ -242,6 +381,12 @@
   $('chooseCampaigns').addEventListener('click',()=>overview().catch(err=>alert(err.message)));
   $('newCampaign').addEventListener('click',selectNew);
   $('campaignCards').addEventListener('click',event=>{
+    const deleteButton=event.target.closest('[data-delete-campaign]');
+    if(deleteButton){
+      openDeleteDialog(deleteButton.dataset.deleteCampaign)
+        .catch(err=>deleteMessage(err.message||'Prüfung fehlgeschlagen.',true));
+      return;
+    }
     const button=event.target.closest('[data-select-campaign]');
     if(button)choose(button.dataset.selectCampaign).catch(err=>alert(err.message));
   });
