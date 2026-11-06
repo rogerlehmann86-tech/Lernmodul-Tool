@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="de-CH"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lernmodule | OSZ Rapperswil</title>
+<meta name="theme-color" content="#C8E6EB">
+<meta name="application-name" content="Lernmodule OSZ Rapperswil">
+<meta name="apple-mobile-web-app-title" content="Lernmodule">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest?v=20261106-icon">
+<link rel="icon" type="image/png" sizes="192x192" href="./app-icon-192.png?v=20261106-icon">
+<link rel="icon" type="image/svg+xml" href="./app-icon.svg?v=20261106-icon">
+<link rel="apple-touch-icon" href="./app-icon-192.png?v=20261106-icon">
 <style>
 :root{--ink:#263d31;--accent:#347548;--brand:#519c62;--brand-light:#8ccb80;--sky:#c8e6eb;--mint:#def1dd;--muted:#547063;--paper:#f7faf8;--line:#c8dfcb}
 *{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,-apple-system,sans-serif;background:var(--paper);color:var(--ink)}
@@ -450,8 +458,8 @@ footer{color:var(--muted)}
 <section id="auth" class="panel" hidden><h2>Administration – Anmeldung</h2><p class="muted">Für berechtigte Lehrpersonen und die Schulverwaltung.</p>
 <label>E-Mail<input id="email" type="email" autocomplete="email" placeholder="E-Mail der Schulverwaltung"></label>
 <label>Passwort<input id="password" type="password" autocomplete="current-password"></label>
-<button id="login">Anmelden</button><button id="signup" class="secondary">Erstregistrierung</button><button id="reset" class="secondary">Passwort zurücksetzen</button><button type="button" id="loginLogout" class="secondary" hidden>Von diesem Konto abmelden</button>
-<p><small>Die Erstregistrierung wird erst nach E-Mail-Bestätigung freigeschaltet.</small></p></section>
+<button id="login">Anmelden</button><button id="reset" class="secondary">Passwort zurücksetzen</button><button type="button" id="loginLogout" class="secondary" hidden>Von diesem Konto abmelden</button>
+<p><small>Neue Administratorzugänge werden ausschliesslich von der Schulverwaltung eingerichtet und separat freigegeben.</small></p></section>
 <section id="admin" class="hidden"><div class="panel admin-toolbar"><div class="admin-toolbar-info"><div><strong>Schulverwaltung</strong><p id="who"></p></div><button id="logout" class="secondary">Abmelden</button></div><div class="admin-toolbar-actions"><button type="button" id="chooseCampaigns">Ausschreibungen</button><span id="selectedCampaignLabel" class="muted">Bitte Ausschreibung auswählen</span></div></div>
 <div id="campaign" class="panel"><h2 id="campaignFormTitle">Neue Ausschreibung</h2><p id="campaignFormInfo" class="muted">Lege eine neue Ausschreibung als Entwurf an.</p><form id="campaignForm">
 <label>Titel<input name="title" required></label><label>Beginn<input type="datetime-local" name="starts_at" required></label>
@@ -517,9 +525,6 @@ async function check(){
  }
 }
 $('login').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){notice(error.message,true);return;}notice('Angemeldet');await check()};
-$('signup').onclick=async()=>{const email=$('email').value.trim().toLowerCase();const password=$('password').value;
-if(!email||password.length<12)return notice('Bitte E-Mail und ein Passwort mit mindestens 12 Zeichen eingeben.',true);
-const {error}=await db.auth.signUp({email,password,emailRedirectTo:location.origin+location.pathname});notice(error?.message||'Bitte die Bestätigungs-E-Mail öffnen. Nur freigegebene Konten erhalten Verwaltungsrechte.',!!error)};
 $('reset').onclick=async()=>{const {error}=await db.auth.resetPasswordForEmail($('email').value.trim(),{redirectTo:location.origin+location.pathname});notice(error?.message||'Falls das Konto existiert, wird eine E-Mail versendet.',!!error)};
 db.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY'){const p=prompt('Neues Passwort (mindestens 12 Zeichen)');if(p?.length>=12)db.auth.updateUser({password:p}).then(({error})=>notice(error?.message||'Passwort geändert',!!error))}});
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};

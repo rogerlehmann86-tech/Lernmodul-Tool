@@ -1,0 +1,26 @@
+{
+  "name": "Lernmodule – Oberstufenzentrum Rapperswil",
+  "short_name": "Lernmodule",
+  "description": "Persönliche Anmeldung und Zuteilung für Lernmodule des OSZ Rapperswil",
+  "lang": "de-CH",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7FAF8",
+  "theme_color": "#C8E6EB",
+  "icons": [
+    {
+      "src": "./app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

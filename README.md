@@ -1,3 +1,11 @@
+## App-Symbol und Administratoranmeldung
+
+Das Vogel-Signet der Schule ist als Icon für Browser-Tabs (Favicon), die Verknüpfung auf dem Home-Bildschirm und die Web-App-Installation integriert. Das PWA-Manifest nutzt das Schulfärbschema; das Bild wird über lokale Dateien und nicht über einen externen Bilddienst geladen.
+
+Die öffentliche Schaltfläche **Erstregistrierung** und ihr `db.auth.signUp()`-Aufruf wurden aus dem Administrationsbereich entfernt. **Ein Supabase-Auth-Konto allein gewährt ohnehin keine Adminrechte**: Die Adminberechtigung wird mit der gesicherten `admin_users`-Tabelle serverseitig geprüft; `anon` und `authenticated` besitzen keine Schreibrechte auf dieser Tabelle.
+
+Wichtig: Der Login wird dadurch aus der Benutzeroberfläche geschlossen, die Supabase-Auth-API kann aber weiterhin externe Registrierungen zulassen. Zur vollständigen Sperrung muss im Supabase-Dashboard unter **Authentication → Sign In / Providers → Email** die öffentliche Anmeldung neuer Benutzer deaktiviert werden (**Allow new users to sign up**). Bestehende Administratoren behalten ihren Login, neue Admins werden durch die Schulverwaltung eingeladen und separat berechtigt.
+
 # Lernmodul-Tool – Oberstufenzentrum Rapperswil
 
 **Testversion** der Verwaltung von Lernmodulen für Schülerinnen und Schüler. Weboberfläche auf GitHub Pages; Daten, Zugriffsrechte und serverseitige Berechnung auf einem **eigenen Supabase-Projekt**. Andere Tools und Datenbanken bleiben getrennt.
