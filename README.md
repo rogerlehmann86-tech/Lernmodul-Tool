@@ -60,6 +60,9 @@ Die eingebauten Formulare behalten ihre bisherigen Funktionen. Sie werden nur in
 ## Zentrale Schülerdatenbank und Zugangskarten
 
 In der Administrator-Kopfzeile öffnet **Schülerdatenbank** eine unabhängige Verwaltung – auch bevor die erste Ausschreibung existiert.
+**Automatische Schüler-ID:** Wer beim Erfassen das ID-Feld leer lässt, bekommt serverseitig eine eindeutige Nummer im Format `S00001`, `S00002` usw. Vorhandene Schulnummern bleiben unverändert. Nummern können aus technischen Gründen gelegentlich Lücken enthalten.
+
+**CSV-Import in der Schülerdatenbank:** Über den Button «CSV-Vorlage herunterladen» kann die vorbereitete Tabelle direkt übernommen werden. Neue Klassen werden automatisch angelegt. Bekannte IDs werden aktualisiert; ohne ID wird ein eindeutiger Name derselben Klasse erkannt. Bei Mehrdeutigkeit oder Klassenwechsel ohne ID bricht der Import kontrolliert ab. Zugangscodes und Anmeldungen bleiben erhalten.
 
 - Schüler suchen, nach Klasse und Status filtern, neu anlegen und bearbeiten (ID, Vorname, Nachname, Klasse).
 - Schüler aktivieren und deaktivieren; Deaktivierung bei bestehenden Anmeldungen ist in der Oberfläche gesperrt.
@@ -80,8 +83,8 @@ Die Backend-Abläufe (Ausgabe, Wiederabruf, Übernahme und Wechsel) wurden mit T
 - Administratoranmeldung über Supabase Auth, E-Mail-Bestätigung und schulinterne Freigabe
 - Mehrere Ausschreibungen mit Start-/Endzeit, Anzahl Modulen pro Schüler und Wunschanzahl
 - Module mit Mindest- und Höchstteilnehmerzahl und optionalen Zeitblöcken
-- CSV-Import der Schülerstammdaten; eindeutige Schüler-IDs
-- Sichere, zufällige persönliche Zugangscodes; nur Hash gespeichert; Ausgabe als CSV
+- Zentraler CSV-Import mit automatischer ID-Vergabe, vorhandenen Schulnummern und Wiedererkennung
+- Zufällige Zugangscodes mit Prüf-Hash und verschlüsselter Vault-Ablage für den Nachdruck
 - Schüleranmeldung mit priorisierten Modulwünschen, ohne öffentliche Einsicht in Schülerdaten
 - Anmeldestand (wer hat Wünsche abgegeben, wer fehlt), CSV-Export und kontrollierte Nachmeldung/Korrektur durch die Schulverwaltung
 - Schliessen der Anmeldephase, automatischer Zuteilungsvorschlag, manuelle Anpassungen und Sperren
@@ -103,22 +106,24 @@ Die URL ist in Supabase **Authentication → URL Configuration** als Site URL un
 
 ## Vollständiger Ablauf mit Testdaten
 
-1. In der Website als Administrator anmelden.
-2. Unter **Ausschreibungen** einen Entwurf erstellen (z. B. eine Stunde offen, 1 Modul pro Schüler, 3 Wünsche).
-3. Unter **Module** mindestens 3 Module anlegen; bei Bedarf zuerst Zeitblöcke erfassen.
-4. Unter **Schüler** die Datei `samples/test-schueler.csv` importieren (vier erfundene Schüler).
-5. **Fehlende Zugangscodes erzeugen** und die heruntergeladene CSV sicher aufbewahren. Codes können nicht nochmals im Klartext abgerufen werden.
-6. **Alle aktiven Schüler zulassen** und **Ausschreibung freigeben**.
-7. In einem privaten Browserfenster Schüler-ID und Code eines Testschülers eingeben, Modulwünsche auswählen, absenden. Bei Bedarf für weitere Testschüler wiederholen.
-8. Unter **Schüler** den Anmeldestand prüfen. Fehlende Anmeldungen können über die Verwaltungsfunktion ergänzt werden.
-9. Im Tab **Zuteilung** die Anmeldung schliessen, Berechnung starten, Resultate und Plätze kontrollieren.
-10. Entwurf bei Bedarf manuell ändern, sperren, speichern, als CSV exportieren.
-11. **Endresultate veröffentlichen**. Erst danach sieht ein Testschüler seine persönliche Zuteilung über Schüler-ID und Code.
-12. Nach Abschluss des Tests die fiktiven Testdaten über den Administrationsweg entfernen. Testdatensätze nicht mit echten Datensätzen vermischen.
+1. Als Administrator anmelden und die **Schülerdatenbank** öffnen.
+2. Schüler direkt erfassen (ID leer lassen) oder die **CSV-Vorlage** herunterladen und fiktive Schüler mit Klassen importieren.
+3. Unter **Ausschreibungen** einen Entwurf erstellen und mindestens so viele Module erfassen, wie Wünsche verlangt werden.
+4. Zugangscodes erzeugen und bei Bedarf unter **Schülerdatenbank** persönliche A4-Karten drucken.
+5. Im Schritt **Teilnehmende auswählen** die gewünschten Schüler oder Klassen für diese Ausschreibung zulassen.
+6. Anmeldung freigeben. Im privaten Browserfenster mit Schüler-ID und Code anmelden und nur die eigene Ausschreibung bearbeiten.
+7. Anmeldungen kontrollieren, Zuteilungen berechnen und nach Prüfung Ergebnisse veröffentlichen.
+8. Fiktive Testdaten nach Abschluss kontrolliert entfernen und nicht mit echten Schülerdaten vermischen.
 
 ## CSV-Format
 
-Zum Beispiel `external_id;first_name;last_name;class`. Deutsche Überschriften wie `Schüler-ID;Vorname;Nachname;Klasse` sowie Komma, Semikolon und Tabulator als Trennzeichen sind grundsätzlich vorgesehen. `.xlsx` zuerst als CSV UTF-8 exportieren.
+Pflichtfelder sind `first_name;last_name;class`. Die Spalte `external_id` ist **optional**. Die herunterladbare Vorlage hat die Reihenfolge `external_id;first_name;last_name;class`. Deutsche Überschriften wie `Schüler-ID;Vorname;Nachname;Klasse` sind ebenfalls vorgesehen. Trennzeichen sind Semikolon, Komma und Tabulator. Excel-Dateien zuerst als CSV UTF-8 speichern.
+
+- **Leere Schüler-ID:** Das Tool vergibt eine neue fortlaufende Nummer.
+- **Bekannte Schüler-ID:** Vorname, Nachname und Klasse werden aktualisiert.
+- **Erneuter Import ohne ID:** Ein eindeutig identifizierbarer Name derselben Klasse wird wiedererkannt.
+- **Unklarer Name, andere Klasse oder widersprüchliche ID:** Der Import stoppt mit einer verständlichen Fehlermeldung. Bei einem Klassenwechsel die bisherige ID mitgeben.
+- Der gesamte CSV-Import erfolgt atomar. Es entstehen keine halbfertigen Klassenlisten durch Fehler in der Datei.
 
 ## Sicherheits- und Betriebsgrenzen
 
