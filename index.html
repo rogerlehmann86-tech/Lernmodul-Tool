@@ -339,6 +339,71 @@ footer{color:var(--muted)}
   .campaign-delete-locked{flex-basis:auto;font-size:11px}
 }
 
+
+/* Pflichtfelder und Fehler am jeweiligen geführten Arbeitsschritt */
+.guide-step.guide-has-error{
+  border:2px solid #b93030;
+  background:#fffafa;
+  box-shadow:0 0 0 3px #b9303010,0 3px 12px #78232314;
+}
+.guide-step.guide-has-error > summary{
+  background:#fff0f0;
+}
+.guide-step.guide-has-error .guide-number{
+  background:#b93030;
+  color:#fff;
+}
+.guide-status-error{
+  display:inline-flex;
+  width:max-content;
+  padding:3px 9px;
+  margin-top:3px;
+  border-radius:999px;
+  border:1px solid #de8e8e;
+  background:#fff1f1;
+  color:#a02323;
+  font-size:12px;
+  font-weight:750;
+  line-height:1.3;
+}
+.guide-status-error[hidden]{display:none!important}
+.guide-error-summary{
+  background:#fff0f0;
+  border:1px solid #d87d7d;
+  border-left:5px solid #b93030;
+  border-radius:8px;
+  color:#8d2424;
+  font-weight:650;
+  line-height:1.5;
+  padding:12px 15px;
+  margin:16px 0;
+}
+.guide-error-summary[hidden]{display:none!important}
+.guide-invalid-field,
+.guide-step input.guide-invalid-field,
+.guide-step select.guide-invalid-field,
+.guide-step textarea.guide-invalid-field{
+  border:2px solid #b93030;
+  background:#fff7f7;
+  color:#592425;
+  box-shadow:0 0 0 3px #b9303012;
+}
+.guide-step .guide-invalid-field:focus{
+  outline:2px solid #b93030;
+  outline-offset:2px;
+}
+.guide-field-error{
+  display:block;
+  color:#a02424;
+  margin:5px 0 10px;
+  font-size:13px;
+  font-weight:650;
+  line-height:1.4;
+}
+.guide-step label:has(>.guide-invalid-field){
+  color:#912020;
+}
+
 </style></head>
 <body><header><div class="site-head"><div><div class="brand">Oberstufenzentrum Rapperswil</div><h1 id="siteHeading">Lernmodule</h1><div id="siteSubtitle">Module entdecken · Wünsche planen</div></div><nav class="site-navigation" aria-label="Ansichten wechseln"><button type="button" id="showStudentView" class="secondary" hidden>Schüleransicht</button><button type="button" id="showAdminView" class="secondary">Administration</button></nav></div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
@@ -393,7 +458,7 @@ window.learningStatusLabel=s=>statusNames[s]||s;
 const db=window.supabase.createClient('https://htqcyvhzrtrmtlqqdzly.supabase.co','sb_publishable_PtdT07j6tRnoH0Y2tFRnhw_sSqa4UnE');
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const notice=(msg,error=false)=>{$('notice').textContent=msg;$('notice').style.color=error?'#a02b28':'#236747'};
+const notice=(msg,error=false)=>{$('notice').textContent=msg;$('notice').style.color=error?'#a02b28':'#236747';};
 async function catalog(){if(typeof window.reloadStudentPortal==='function')return window.reloadStudentPortal();}
 
 let isAdminAccount=false;
@@ -485,58 +550,80 @@ async function refresh(){
 }
 $('campaignForm').onsubmit=async e=>{
  e.preventDefault();
- const form=$('campaignForm'),a=Object.fromEntries(new FormData(form));
- a.modules_per_student=+a.modules_per_student;a.max_preferences=+a.max_preferences;
- if(a.max_preferences<a.modules_per_student)return notice('Mindestens so viele Wünsche wie zugeteilte Module erforderlich.',true);
- a.starts_at=new Date(a.starts_at).toISOString();
- a.ends_at=new Date(a.ends_at).toISOString();
- const id=window.learningCurrentCampaignId;
- const isEditing=!!id&&window.learningCampaignEditing===true;
- let newId=id,err;
- if(isEditing){
-  const r=await db.rpc('update_learning_campaign_draft',{
-   p_campaign_id:id,p_title:a.title,p_starts_at:a.starts_at,p_ends_at:a.ends_at,
-   p_modules_per_student:a.modules_per_student,p_max_preferences:a.max_preferences
-  });err=r.error;
- }else{
-  const r=await db.from('campaigns').insert(a).select('id').single();
-  err=r.error;newId=r.data?.id;
- }
- if(err)return notice(err.message,true);
- notice(isEditing?'Ausschreibung aktualisiert':'Entwurf gespeichert');
- await refresh();
- if(newId&&typeof window.learningChooseCampaign==='function')
-  await window.learningChooseCampaign(newId,{step:isEditing?'campaign':'modules'});
- else window.learningGuideAdvance?.('campaign');
+ const form=e.currentTarget;
+ if(window.learningGuideValidateForm&&!window.learningGuideValidateForm(form))return;
+ const save=$('campaignSave');
+ save.disabled=true;
+ try{
+  const a=Object.fromEntries(new FormData(form));
+  a.modules_per_student=Number(a.modules_per_student);
+  a.max_preferences=Number(a.max_preferences);
+  a.starts_at=new Date(a.starts_at).toISOString();
+  a.ends_at=new Date(a.ends_at).toISOString();
+  const id=window.learningCurrentCampaignId;
+  const isEditing=!!id&&window.learningCampaignEditing===true;
+  let newId=id,err;
+  if(isEditing){
+   const r=await db.rpc('update_learning_campaign_draft',{
+    p_campaign_id:id,p_title:a.title,p_starts_at:a.starts_at,p_ends_at:a.ends_at,
+    p_modules_per_student:a.modules_per_student,p_max_preferences:a.max_preferences
+   });err=r.error;
+  }else{
+   const r=await db.from('campaigns').insert(a).select('id').single();
+   err=r.error;newId=r.data?.id;
+  }
+  if(err)throw err;
+  window.learningGuideClearError?.('campaign');
+  notice(isEditing?'Ausschreibung aktualisiert':'Entwurf gespeichert');
+  await refresh();
+  if(newId&&typeof window.learningChooseCampaign==='function')
+   await window.learningChooseCampaign(newId,{step:isEditing?'campaign':'modules'});
+  else window.learningGuideAdvance?.('campaign');
+ }catch(error){
+  window.learningGuideReportError?.('campaign','Die Ausschreibung konnte nicht gespeichert werden: '+(error.message||'Bitte Angaben prüfen.'));
+ }finally{save.disabled=false;}
 };
 $('moduleForm').onsubmit=async e=>{
  e.preventDefault();
- const form=$('moduleForm'),a=Object.fromEntries(new FormData(form));
+ const form=e.currentTarget;
+ if(window.learningGuideValidateForm&&!window.learningGuideValidateForm(form))return;
  const cid=window.learningCurrentCampaignId;
- if(!cid)return notice('Bitte zuerst eine Ausschreibung auswählen.',true);
- a.campaign_id=cid;
- a.min_capacity=+a.min_capacity;a.max_capacity=+a.max_capacity;
- if(!a.time_slot_id)delete a.time_slot_id;
- const editId=window.learningEditingModuleId;
- let error;
- if(editId){
-  const response=await db.rpc('update_learning_module',{
-   p_module_id:editId,p_title:a.title,p_description:a.description||null,
-   p_min_capacity:a.min_capacity,p_max_capacity:a.max_capacity,p_time_slot_id:a.time_slot_id||null
-  });error=response.error;
- }else{
-  const response=await db.from('modules').insert(a);error=response.error;
+ if(!cid){
+  window.learningGuideReportError?.('modules','Bitte zuerst eine Ausschreibung anlegen und speichern.');
+  return;
  }
- if(error)return notice(error.message,true);
- window.learningEditingModuleId=null;
- $('moduleSave').textContent='Modul speichern';
- $('moduleCancelEdit').hidden=true;
- form.reset();
- await refresh();
- $('moduleCampaign').value=cid;
- if(typeof window.reloadModuleTimeSlots==='function')await window.reloadModuleTimeSlots();
- notice(editId?'Modul aktualisiert':'Modul gespeichert');
- if(!editId)window.learningGuideAdvance?.('modules');
+ const button=$('moduleSave');
+ button.disabled=true;
+ try{
+  const a=Object.fromEntries(new FormData(form));
+  a.campaign_id=cid;
+  a.min_capacity=Number(a.min_capacity);
+  a.max_capacity=Number(a.max_capacity);
+  if(!a.time_slot_id)delete a.time_slot_id;
+  const editId=window.learningEditingModuleId;
+  let error;
+  if(editId){
+   const response=await db.rpc('update_learning_module',{
+    p_module_id:editId,p_title:a.title,p_description:a.description||null,
+    p_min_capacity:a.min_capacity,p_max_capacity:a.max_capacity,p_time_slot_id:a.time_slot_id||null
+   });error=response.error;
+  }else{
+   const response=await db.from('modules').insert(a);error=response.error;
+  }
+  if(error)throw error;
+  window.learningGuideClearError?.('modules');
+  window.learningEditingModuleId=null;
+  button.textContent='Modul speichern';
+  $('moduleCancelEdit').hidden=true;
+  form.reset();
+  await refresh();
+  $('moduleCampaign').value=cid;
+  if(typeof window.reloadModuleTimeSlots==='function')await window.reloadModuleTimeSlots();
+  notice(editId?'Modul aktualisiert':'Modul gespeichert');
+  if(!editId)window.learningGuideAdvance?.('modules');
+ }catch(error){
+  window.learningGuideReportError?.('modules','Das Modul konnte nicht gespeichert werden: '+(error.message||'Bitte Eingaben prüfen.'));
+ }finally{button.disabled=false;}
 };
 $('moduleCancelEdit').onclick=()=>{
  window.learningEditingModuleId=null;
@@ -570,7 +657,7 @@ $('moduleList').addEventListener('click',async e=>{
  if(!confirm('Modul «'+mod.title+'» wirklich löschen? Dies kann nicht rückgängig gemacht werden.'))return;
  del.disabled=true;
  const {error}=await db.rpc('delete_learning_module',{p_module_id:id});
- if(error){del.disabled=false;return notice(error.message,true);}
+ if(error){del.disabled=false;window.learningGuideReportError?.('modules','Das Modul konnte nicht gelöscht werden: '+error.message);return;}
  window.learningEditingModuleId=null;
  $('moduleSave').textContent='Modul speichern';$('moduleCancelEdit').hidden=true;
  await refresh();notice('Modul gelöscht');
@@ -621,6 +708,6 @@ catalog();check();
 <script src="registration-admin.js?v=20261105-verwaltung" defer></script>
 <script src="allocation-admin.js?v=20261105-verwaltung" defer></script>
 
-<script src="guided-workflow.js?v=20261106-delete2step" defer></script>
+<script src="guided-workflow.js?v=20261106-inlinevalidation" defer></script>
 <script src="student-directory.js?v=20261106-autoidcsv" defer></script>
 </body></html>
