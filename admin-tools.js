@@ -2,7 +2,14 @@
 (() => {
   const $=id=>document.getElementById(id);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const message=(s,bad=false)=>{$('notice').textContent=s;$('notice').style.color=bad?'#9b3030':'#24664e';};
+  const message=(s,bad=false)=>{
+    $('notice').textContent=s;
+    $('notice').style.color=bad?'#9b3030':'#24664e';
+    if(bad){
+      const step=document.querySelector('#learningGuide .guide-step[open]')?.dataset.step;
+      if(step)window.learningGuideReportError?.(step,s);
+    }
+  };
   const quote=v=>{let s=String(v??'');if(/^\s*[=+\-@]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
   const exportCsv=(name,rows)=>{
     const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});
