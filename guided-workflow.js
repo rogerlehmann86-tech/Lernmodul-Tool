@@ -163,6 +163,7 @@
   }
   let campaignRows=[];
   let deleteCandidate=null;
+  let deleteInspectionSerial=0;
   async function listCampaigns(){
     const {data,error}=await db.from('campaigns')
       .select('id,title,status,starts_at,ends_at,created_at')
@@ -191,6 +192,7 @@
     text.style.color=error?'#a02b28':'var(--muted)';
   }
   function closeDeleteDialog(){
+    deleteInspectionSerial++;
     const dialog=$('campaignDeleteDialog');
     if(dialog.open)dialog.close();
     deleteCandidate=null;
@@ -199,6 +201,7 @@
     deleteMessage('');
   }
   async function openDeleteDialog(id){
+    const inspection=++deleteInspectionSerial;
     const candidate=campaignRows.find(c=>c.id===id);
     if(!candidate)return;
     deleteCandidate=null;
@@ -220,7 +223,7 @@
       db.from('assignments').select('*',{count:'exact',head:true}).eq('campaign_id',id),
       db.from('allocation_runs').select('*',{count:'exact',head:true}).eq('campaign_id',id)
     ]);
-    if(!dialog.open)return;
+    if(!dialog.open||inspection!==deleteInspectionSerial)return;
     const error=checks.find(r=>r.error)?.error;
     if(error){$('campaignDeleteStatistics').textContent='Prüfung nicht möglich.';return deleteMessage(error.message,true);}
     const fresh=checks[0].data;
@@ -244,6 +247,7 @@
   }
   $('campaignDeleteClose').addEventListener('click',closeDeleteDialog);
   $('campaignDeleteDialog').addEventListener('close',()=>{
+    deleteInspectionSerial++;
     deleteCandidate=null;
     $('campaignDeleteTyped').value='';
     $('campaignDeleteCommit').disabled=true;
