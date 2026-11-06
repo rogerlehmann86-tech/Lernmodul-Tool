@@ -2,7 +2,11 @@
 (() => {
   const $=id=>document.getElementById(id);
   const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const msg=(s,error=false)=>{$('notice').textContent=s;$('notice').style.color=error?'#a02b28':'#236747';};
+  const msg=(s,error=false)=>{
+    $('notice').textContent=s;
+    $('notice').style.color=error?'#a02b28':'#236747';
+    if(error)window.learningGuideReportError?.('modules',s);
+  };
   const form=$('moduleForm'),campaign=$('moduleCampaign'),select=$('moduleTimeSlot');
   const area=document.createElement('div');
   area.className='tool-section';
