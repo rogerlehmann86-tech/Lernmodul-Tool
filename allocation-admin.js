@@ -3,7 +3,10 @@
   'use strict';
   const $=id=>document.getElementById(id);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const msg=(s,error=false)=>{const e=$('allocationNotice');e.textContent=s;e.style.color=error?'#a02b28':'#226d4d'};
+  const msg=(s,error=false)=>{
+    const e=$('allocationNotice');e.textContent=s;e.style.color=error?'#a02b28':'#226d4d';
+    if(error)window.learningGuideReportError?.('allocation',s);
+  };
   let campaign=null,preview=null,students=new Map(),modules=new Map(),preferred=new Map(),lockedIds=new Map();
   const panel=$('allocation');
   if(!panel)return;
