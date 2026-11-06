@@ -24,7 +24,11 @@
   const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(csvQuote).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
  }
- function message(t,err=false){$('registrationInfo').textContent=t;$('registrationInfo').style.color=err?'#a02b28':'#226d4d';}
+ function message(t,err=false){
+   $('registrationInfo').textContent=t;
+   $('registrationInfo').style.color=err?'#a02b28':'#226d4d';
+   if(err)window.learningGuideReportError?.('registration',t);
+ }
  async function rows(table,fields,id,order='id'){
    const list=[];
    for(let start=0;start<3500;start+=500){
