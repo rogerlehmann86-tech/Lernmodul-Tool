@@ -17,14 +17,20 @@ panel.innerHTML=
 '<label>Status<select id="directoryStatus"><option value="active">Aktiv</option><option value="all">Alle</option><option value="inactive">Inaktiv</option></select></label></div>'+
 '<p id="directoryMessage" class="muted" role="status"></p>'+
 '<div id="directoryEditor" class="directory-editor" hidden><h3 id="directoryEditorTitle">Schüler erfassen</h3>'+
-'<form id="directoryForm"><div class="directory-filters">'+
-'<label>Schüler-ID<input name="external_id" maxlength="80" required></label>'+
+'<form id="directoryForm"><p class="muted">Ohne ID vergibt das Tool automatisch eine Nummer wie S00001. Bestehende Schulnummern kannst du weiterverwenden.</p><div class="directory-filters">'+
+'<label>Schüler-ID (optional)<input name="external_id" maxlength="80" placeholder="Leer lassen = automatische Vergabe"></label>'+
 '<label>Vorname<input name="first_name" maxlength="100" required></label>'+
 '<label>Nachname<input name="last_name" maxlength="100" required></label>'+
 '<label>Klasse<input name="class_name" list="directoryClassNames" maxlength="80" required></label>'+
 '<datalist id="directoryClassNames"></datalist></div>'+
 '<button type="submit" id="directorySave">Speichern</button><button type="button" class="secondary" id="directoryCancel">Abbrechen</button></form></div>'+
 '<div class="alloc-scroll"><table id="directoryTable"></table></div>'+
+'<section class="directory-import"><h3>Schüler und Klassen per CSV importieren</h3>'+
+'<p class="muted">Vorname, Nachname und Klasse sind Pflichtfelder; Schüler-ID ist optional. Bestehende IDs werden aktualisiert, ohne IDs werden eindeutige Namen wiedererkannt.</p>'+
+'<div class="directory-import-actions"><input type="file" id="directoryStudentCsv" accept=".csv,text/csv">'+
+'<button type="button" id="directoryImportStudents">CSV importieren</button>'+
+'<button type="button" class="secondary" id="directoryCsvTemplate">CSV-Vorlage herunterladen</button></div>'+
+'<p id="directoryImportInfo" class="muted" role="status"></p></section>'+
 '<section class="directory-print"><h3>Zugangskarten als A4-PDF</h3>'+
 '<p class="muted">Mit Name, Klasse, Schüler-ID und Zugangscode. Bitte PDFs vertraulich behandeln.</p>'+
 '<div class="directory-filters"><label>Wer soll gedruckt werden?<select id="directoryPrintScope">'+
@@ -99,25 +105,75 @@ $('directoryForm').onsubmit=async e=>{
  e.preventDefault();
  const payload=Object.fromEntries(new FormData(e.target));
  for(const key in payload)payload[key]=payload[key].trim();
- if(Object.values(payload).some(x=>!x))return info('Alle Felder ausfüllen.',true);
+ if(['first_name','last_name','class_name'].some(k=>!payload[k]))return info('Vorname, Nachname und Klasse sind erforderlich.',true);
  const btn=$('directorySave');btn.disabled=true;
  try{
   const old=pupils.find(s=>s.id===editId);
+  if(old&&!payload.external_id)payload.external_id=old.external_id;
   if(old&&old.external_id!==payload.external_id&&!confirm('Die Schüler-ID wird geändert. Alte Zugriffskarten funktionieren danach nicht mehr. Weiter?'))return;
+  if(!old&&pupils.some(s=>s.first_name.toLocaleLowerCase('de-CH')===payload.first_name.toLocaleLowerCase('de-CH')&&s.last_name.toLocaleLowerCase('de-CH')===payload.last_name.toLocaleLowerCase('de-CH')&&s.classes?.name===payload.class_name)){
+    throw Error('Dieser Schüler ist in derselben Klasse bereits vorhanden. Bitte den Datensatz bearbeiten.');
+  }
   let klass=classes.find(c=>c.name===payload.class_name);
   if(!klass){
    const r=await db.from('classes').upsert({name:payload.class_name},{onConflict:'name'}).select('id,name').single();
    if(r.error)throw r.error;klass=r.data;
   }
-  const values={external_id:payload.external_id,first_name:payload.first_name,last_name:payload.last_name,class_id:klass.id};
-  const r=editId?await db.from('students').update(values).eq('id',editId).select('id').single():
-   await db.from('students').insert({...values,active:true}).select('id').single();
+  const values={first_name:payload.first_name,last_name:payload.last_name,class_id:klass.id};
+  if(payload.external_id)values.external_id=payload.external_id;
+  const r=editId?await db.from('students').update(values).eq('id',editId).select('id,external_id').single():
+   await db.from('students').insert({...values,active:true}).select('id,external_id').single();
   if(r.error)throw r.error;
   editId=null;$('directoryEditor').hidden=true;
-  await reload();info('Schülerdaten gespeichert.');
+  await reload();info('Schülerdaten gespeichert. Schüler-ID: '+r.data.external_id);
  }catch(error){info(error.message||'Speichern fehlgeschlagen.',true)}
  finally{btn.disabled=false;}
 };
+
+/* Import als eine Datenbanktransaktion statt einzelner Schüler-Uploads. */
+$('directoryCsvTemplate').onclick=()=>{
+ const csv='\uFEFFexternal_id;first_name;last_name;class\r\n;Lina;Muster;7a\r\n;Noah;Beispiel;7a\r\nSCHULE-001;Emma;Test;7b\r\n';
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+ const link=document.createElement('a');
+ link.href=url;link.download='lernmodule-schueler-vorlage.csv';link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),2000);
+};
+$('directoryImportStudents').onclick=async()=>{
+ const file=$('directoryStudentCsv').files[0];
+ if(!file)return info('Bitte zuerst eine Schüler-CSV auswählen.',true);
+ const button=$('directoryImportStudents');
+ button.disabled=true;
+ $('directoryImportInfo').textContent='CSV wird geprüft …';
+ try{
+  if(file.size>1024*1024)throw Error('Datei zu gross (maximal 1 MB).');
+  if(typeof window.parseCSV!=='function')throw Error('CSV-Lesefunktion nicht verfügbar. Bitte neu laden.');
+  const parsed=window.parseCSV(await file.text());
+  if(!parsed.length||parsed.length>1500)throw Error('Bitte 1 bis 1500 Schüler importieren.');
+  const rows=parsed.map(row=>({
+    external_id:String(row.external_id||'').trim(),
+    first_name:String(row.first_name||'').trim(),
+    last_name:String(row.last_name||'').trim(),
+    class:String(row.class||'').trim()
+  }));
+  if(rows.some(row=>!row.first_name||!row.last_name||!row.class))
+    throw Error('Vorname, Nachname und Klasse müssen ausgefüllt sein; die ID darf leer sein.');
+  const existing=rows.filter(x=>x.external_id).length;
+  if(!confirm(rows.length+' Schüler importieren?\n'+existing+' mit vorhandener ID, '+(rows.length-existing)+
+   ' ohne ID.\nVorhandene Schüler werden aktualisiert; ihre Codes bleiben bestehen.'))return;
+  $('directoryImportInfo').textContent='Import läuft …';
+  const {data,error}=await db.rpc('import_learning_students',{p_rows:rows});
+  if(error)throw error;
+  $('directoryStudentCsv').value='';
+  await reload();
+  $('directoryImportInfo').textContent=data.created+' neue Schüler, '+data.updated+
+    ' aktualisiert. Die Schüler-IDs sind in der Tabelle sichtbar.';
+  info('CSV-Import abgeschlossen: '+data.created+' neu, '+data.updated+' aktualisiert.');
+ }catch(err){
+  $('directoryImportInfo').textContent='Import nicht abgeschlossen. Bei Fehlern werden keine Teilimporte übernommen.';
+  info(err.message||'CSV-Import fehlgeschlagen.',true);
+ }finally{button.disabled=false;}
+};
+
 $('directoryTable').onclick=async event=>{
  const button=event.target.closest('[data-edit],[data-card],[data-toggle]');
  if(!button)return;
