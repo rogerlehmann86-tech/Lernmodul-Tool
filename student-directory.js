@@ -40,11 +40,14 @@ panel.innerHTML=
 '<button type="button" id="directoryPrint">PDF erstellen</button>'+
 '<button type="button" id="directoryIssue" class="secondary">Fehlende Zugangscodes erzeugen</button>'+
 '<button type="button" id="directoryReplace" class="danger">Codes für Auswahl neu ausstellen</button>'+
-'<p class="muted">Bestehende Zugangscodes werden dabei nicht geändert.</p>'+
-'<details><summary>Vorhandene Zugangscodes aus der ursprünglichen CSV übernehmen</summary>'+
-'<p class="muted">Code-CSV mit Schueler_ID und Zugangscode auswählen. Die Codes werden überprüft und verschlüsselt für spätere Druckaufträge gespeichert.</p>'+
+'<p class="muted">Fehlende Codes erstellen verändert vorhandene Codes nicht. «Codes für Auswahl neu ausstellen» macht hingegen die bisherigen Codes dieser Schüler ungültig.</p>'+
+'<details id="directoryAdvanced" class="directory-advanced" hidden>'+
+'<summary>Erweiterte Verwaltung</summary>'+
+'<p id="directoryLegacyInfo" class="muted" role="status"></p>'+
+'<h4>Ältere Zugangscodes übernehmen</h4>'+
+'<p class="muted">Nur für bereits früher vergebene Codes ohne verschlüsselte Nachdruckkopie: Ursprüngliche CSV mit Schueler_ID und Zugangscode auswählen. Die Codes werden geprüft und sicher gespeichert, ohne dass sich der Schülercode ändert.</p>'+
 '<input type="file" id="directoryCodeCsv" accept=".csv,text/csv">'+
-'<button type="button" class="secondary" id="directoryImportCodes">Codes übernehmen</button></details></section>';
+'<button type="button" class="secondary" id="directoryImportCodes">Alte Codes übernehmen</button></details></section>';
 actions.closest('.panel').insertAdjacentElement('afterend',panel);
 let pupils=[],classes=[],codes=new Set(),editId=null;
 function info(t,error=false){$('directoryMessage').textContent=t;$('directoryMessage').style.color=error?'#a02b28':'var(--muted)'}
@@ -57,6 +60,20 @@ async function getRows(table,columns){
  }
  throw Error('Die Liste ist zu gross für diese Testversion.');
 }
+async function refreshLegacyCodeStatus(){
+ const advanced=$('directoryAdvanced');
+ const label=$('directoryLegacyInfo');
+ const {data,error}=await db.rpc('count_learning_legacy_codes');
+ if(error){
+  advanced.hidden=false;
+  label.textContent='Der Status früherer Zugangscodes konnte nicht geprüft werden. Die Übernahme bleibt vorsorglich verfügbar.';
+  return;
+ }
+ const missing=Number(data)||0;
+ advanced.hidden=missing===0;
+ if(missing===0)advanced.open=false;
+ label.textContent=missing+' ältere Zugangscodes sind noch nicht für den Nachdruck hinterlegt. Sobald alle übernommen oder neu ausgestellt sind, wird dieser Bereich automatisch ausgeblendet.';
+}
 async function reload(){
  info('Schüler werden geladen …');
  [pupils,classes]=await Promise.all([
@@ -68,6 +85,7 @@ async function reload(){
  if(classes.some(c=>c.name===current))$('directoryClass').value=current;
  $('directoryClassNames').innerHTML=classes.map(c=>'<option value="'+esc(c.name)+'"></option>').join('');
  render();
+ await refreshLegacyCodeStatus();
 }
 function filtered(){
  const term=$('directorySearch').value.trim().toLocaleLowerCase('de-CH');
@@ -332,6 +350,7 @@ $('directoryImportCodes').onclick=async()=>{
    if(error)errors.push(entry.id+': '+error.message);else ok++;
   }
   $('directoryCodeCsv').value='';
+  await refreshLegacyCodeStatus();
   info(ok+' Codes übernommen.'+(errors.length?' Fehler: '+errors.join(', ').slice(0,350):''),!!errors.length);
  }catch(err){info(err.message,true)}finally{button.disabled=false}
 };
