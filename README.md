@@ -38,6 +38,19 @@ Das Löschen besteht bewusst aus **zwei Schritten**:
 
 Zusätzlich kontrolliert die Supabase-Datenbank **erneut** die Administratorberechtigung, den ausgeschriebenen Namen, den aktuellen Status sowie vorhandene Schüleranmeldungen und Zuteilungen. Sind solche Datensätze vorhanden, wird die Löschung auch bei korrekter Bestätigung verweigert. Jede erfolgreiche Löschung wird im Änderungsprotokoll festgehalten. Der Dialog lässt sich jederzeit abbrechen. Es gibt keine automatische Löschung.
 
+## Pflichtfeldkontrolle und Fehlermeldungen im geführten Ablauf
+
+Die Formulare für Ausschreibungen, Module und Zeitblöcke prüfen ihre Pflichtfelder direkt im jeweiligen aufklappbaren Container. Fehlende oder ungültige Felder erhalten eine **rote Umrandung** und eine **Fehlermeldung unmittelbar unter dem Feld**. Zusätzlich erscheinen eine rote Hinweisfläche im Container und der Status **«Bitte prüfen»** an der Überschrift.
+
+Die Weiter-Schaltflächen kontrollieren, ob notwendige Voraussetzungen erfüllt sind:
+
+- Eine neue Ausschreibung muss vollständig erfasst und tatsächlich gespeichert sein.
+- Änderungen an einem bestehenden Entwurf müssen zuerst gespeichert werden.
+- Für die Modulwünsche müssen genügend aktive Module vorhanden sein; laufende Modulbearbeitungen müssen abgeschlossen werden.
+- Für spätere Schritte müssen Schüler erfasst, Zugangscodes ausgegeben, Teilnehmende ausgewählt und die Anmeldung freigegeben sein.
+
+Bei Fehlern aus Supabase, dem Modulformular, Zeitblöcken oder anderen Verwaltungsaktionen erscheint der Fehlertext auch im jeweils zugehörigen Arbeitsschritt. Der Container bleibt zur Korrektur erreichbar. Die Abschnitte lassen sich zur Kontrolle weiterhin **manuell öffnen und schliessen**; der geführte Button «Weiter» sowie die automatische Weiterschaltung kontrollieren dagegen die Voraussetzungen. Ein rot markierter Schritt wird nach erfolgreicher Korrektur beziehungsweise Speicherung zurückgesetzt.
+
 ## Administratorbereich: Ausschreibungen zuerst auswählen
 
 Die bisherige Vierfach-Navigation wurde durch eine schlanke Kopfzeile mit dem Button **Ausschreibungen** ersetzt. Nach dem Login wird zunächst eine Liste aller Ausschreibungen mit **deutschen Statusbezeichnungen** angezeigt:
