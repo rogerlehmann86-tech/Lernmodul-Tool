@@ -4,12 +4,28 @@
 
 ## Getrennte Schüler- und Administratoransicht
 
-- Ohne Admin-Anmeldung erscheint ausschliesslich die Schüleransicht mit Modulkatalog, Wunschabgabe und persönlichem Ergebnisabruf.
+- Ohne Administratoranmeldung erscheint die **Schüler-Anmeldemaske**. Ausschreibungen und Module sind noch nicht sichtbar.
+- Schüler melden sich mit **Schüler-ID und persönlichem Zugangscode** an und sehen ausschliesslich diejenigen Ausschreibungen, denen sie über die Schüler-Zulassung zugeordnet sind.
+- Die Login-Abfrage prüft die Zugangsangaben serverseitig und gibt nur Informationen zu den berechtigten Ausschreibungen zurück. Direkte anonyme SELECT-Abfragen auf die Ausschreibungs- und Modultabellen liefern keine Datensätze mehr.
+- Offene Ausschreibungen zeigen die Modulwahl, bereits abgegebene Wünsche erscheinen zur Kontrolle. Bei veröffentlichten Ergebnissen werden nur die persönlichen Zuteilungen angezeigt. Entwürfe bleiben verborgen.
+- Die Schüler-Zugangsdaten werden **nicht** in localStorage, Cookies oder sessionStorage gespeichert. Sie bleiben bis zum Neuladen bzw. Abmelden nur im JavaScript-Arbeitsspeicher, damit für die Wunschabgabe kein zweiter Login nötig ist.
+- Nach 8 falschen Codeversuchen für dieselbe Schüler-ID innerhalb von 15 Minuten wird dieser Login für 15 Minuten blockiert. Das ist ein Grundschutz, ersetzt aber noch kein umfassendes server-/IP-basiertes Rate-Limiting.
 - Über **Administration** im Kopfbereich öffnet sich das gesonderte Anmeldeformular.
 - Nach erfolgreicher Prüfung des Administratorkontos wird ausschliesslich die geführte Verwaltung angezeigt. Die drei öffentlichen Schülerbereiche stehen nicht mehr darüber.
 - Ein Administrator kann über **Schüleransicht** die öffentliche Ansicht kontrollieren und mit **Zur Verwaltung** zurückwechseln, ohne sich abmelden zu müssen.
 - Der Ansichtswechsel ist eine reine Darstellungssache. Die Datenbankrechte werden weiterhin ausschliesslich durch Authentifizierung und Row Level Security gesteuert.
 - Für einen direkten Link zum Administrator-Login kann die Adresse mit `?ansicht=admin` verwendet werden; ein bereits angemeldeter Administrator kommt standardmässig sofort in die Verwaltung.
+
+## Test des persönlichen Schülerportals
+
+1. Auf der Administratorseite eine offene Ausschreibung auswählen und mindestens einen Schüler unter **Teilnehmende auswählen** zulassen.
+2. Mit einem persönlichen Testcode die Schüleransicht öffnen.
+3. Nach der Anmeldung erscheint **nur diese freigegebene Ausschreibung**. Ein anderer Schüler ohne diese Zulassung sieht sie nicht.
+4. Wünsche speichern und danach kontrollieren, ob sie als abgegeben angezeigt werden.
+5. Nach Veröffentlichung der Zuteilung sind die eigenen Ergebnisse auf derselben Seite abrufbar.
+6. **Abmelden** löscht die Zugangsdaten aus dem laufenden Schülerportal; auch ein Neuladen erfordert eine neue Anmeldung.
+
+Die Datenbankprüfungen wurden mit vollständig zurückgesetzten Testdaten durchgeführt. Die öffentliche Website wurde noch nicht mit einem realen Browser-End-to-End-Test verifiziert.
 
 ## Administratorbereich: Ausschreibungen zuerst auswählen
 
@@ -109,7 +125,7 @@ Zum Beispiel `external_id;first_name;last_name;class`. Deutsche Überschriften w
 - GitHub-Repository und GitHub-Pages-Website sind öffentlich. Nur Programmdateien veröffentlichen. **Keine** Schülertabellen, Zugangscodes, Passwortdateien oder geheime Supabase-Schlüssel hochladen.
 - Die öffentliche Supabase-Publishable-Key ist bewusst im Browser hinterlegt. Geheimschlüssel gehören ausschliesslich auf den Server.
 - SQL-RLS und administrative Serverfunktionen schützen Daten und Freigaben.
-- Beim letzten Sicherheitscheck meldete Supabase **Leaked Password Protection Disabled**. Vor echtem Betrieb aktivieren: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+- Die Supabase-Option **Prevent use of leaked passwords** wurde aktiviert. Die automatische Sicherheitsprüfung meldete zuletzt keine Warnungen.
 - Vor Produktiveinsatz: Tests im realen Browser einschliesslich Edge Function, Datenschutzfreigabe für Minderjährige, Aufbewahrungsfristen, Löschverfahren, Schutz vor automatisierten Codeversuchen/Rate-Limits, E-Mail-Absender und Zugangsverwaltung prüfen.
 - Ein automatisierter End-to-End-Test der veröffentlichten Website wurde noch **nicht** durchgeführt. Serverfunktionen und das Zuteilungsverfahren wurden mit synthetischen Daten getestet; Datenbanktests liefen mit `ROLLBACK` und hinterliessen keine Schülerdaten.
 
