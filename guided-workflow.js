@@ -665,6 +665,11 @@
       clearError('modules');
     }
     if(next){
+      if(['students','codes','eligibility','publish'].includes(completedStep)){
+        const ready=await mayProceedFrom(completedStep);
+        if(!ready)return;
+      }
+      clearError(completedStep);
       openStep(next,true);
       $('guideProgress').textContent='Nächster Schritt: '+steps.find(s=>s.id===next)?.title;
     }
