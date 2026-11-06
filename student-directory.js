@@ -132,7 +132,7 @@ $('directoryForm').onsubmit=async e=>{
 
 /* Import als eine Datenbanktransaktion statt einzelner Schüler-Uploads. */
 $('directoryCsvTemplate').onclick=()=>{
- const csv='\uFEFFexternal_id;first_name;last_name;class\r\n;Lina;Muster;7a\r\n;Noah;Beispiel;7a\r\nSCHULE-001;Emma;Test;7b\r\n';
+ const csv='\uFEFFexternal_id;first_name;last_name;class\r\n';
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
  const link=document.createElement('a');
  link.href=url;link.download='lernmodule-schueler-vorlage.csv';link.click();
