@@ -96,7 +96,7 @@ In der Administrator-Kopfzeile öffnet **Schülerdatenbank** eine unabhängige V
 
 ### Bestehende Codes nachdrucken
 
-Die früher erzeugten Codes sind nur als Hash gespeichert. Der Klartext ist daraus nicht wiederherstellbar. Mit der ursprünglichen Code-CSV (Spalten Schueler_ID und Zugangscode) können diese Codes unverändert in eine verschlüsselte Ablage in **Supabase Vault** übernommen werden. Erst danach ist der Nachdruck ohne Codewechsel möglich. Bei Verlust der alten CSV bleibt die ausdrücklich bestätigte Neuausgabe; dabei werden die alten Karten ungültig.
+Die früher erzeugten Codes sind nur als Hash gespeichert. Der Klartext ist daraus nicht wiederherstellbar. Die einmalige Übernahme der ursprünglichen Code-CSV ist deshalb nur noch im **eingeklappten Bereich «Erweiterte Verwaltung»** der zentralen Schülerdatenbank verfügbar. Der Bereich wird nur angezeigt, solange Zugangscodes ohne verschlüsselte Nachdruckkopie existieren; die Zahl der betroffenen Codes wird serverseitig geprüft. Stand 6. November 2026: vier ältere Codes. Nach Übernahme oder Neuausgabe aller Codes verschwindet der Bereich automatisch aus der Ansicht. Schülerdaten und vorhandene Zugangscodes werden dabei nicht eigenmächtig verändert. Bei Verlust der alten CSV bleibt die ausdrücklich bestätigte Neuausgabe; dabei werden die alten Karten ungültig.
 
 Seit dieser Version werden neue Codes serverseitig generiert und zusätzlich verschlüsselt im Vault abgelegt. Nur die verifizierte Schulverwaltung darf sie über eine geschützte Datenbankfunktion für die PDF-Erstellung abrufen. Keine Codes in GitHub oder andere öffentliche Ablagen hochladen. Die PDFs entstehen lokal im Browser mit einer festgelegten jsPDF-Version; gedruckte Karten und PDF-Dateien vertraulich behandeln.
 
