@@ -258,6 +258,14 @@ footer{color:var(--muted)}
 #studentPortalNotice{padding:0 4px;margin:10px auto;max-width:650px}
 @media(max-width:650px){.portal-actions{width:100%}.portal-actions button{flex:1}}
 
+
+/* CSV-Import in der globalen Schülerdatenbank */
+.directory-import{border-top:1px solid var(--line);margin-top:20px;padding:17px 0}
+.directory-import h3{margin-top:0}
+.directory-import-actions{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;margin:14px 0}
+.directory-import-actions input[type=file]{max-width:360px;flex:1 1 230px;margin:0;padding:8px;background:#fff}
+.directory-import-actions button{margin:0}
+#directoryImportInfo{font-size:14px}
 </style></head>
 <body><header><div class="site-head"><div><div class="brand">Oberstufenzentrum Rapperswil</div><h1 id="siteHeading">Lernmodule</h1><div id="siteSubtitle">Module entdecken · Wünsche planen</div></div><nav class="site-navigation" aria-label="Ansichten wechseln"><button type="button" id="showStudentView" class="secondary" hidden>Schüleransicht</button><button type="button" id="showAdminView" class="secondary">Administration</button></nav></div></header>
 <main><div id="notice" role="status" aria-live="polite"></div>
@@ -301,8 +309,9 @@ footer{color:var(--muted)}
 <label>Titel<input name="title" required></label><label>Beschreibung<textarea name="description"></textarea></label><label>Zeitblock (optional)<select name="time_slot_id" id="moduleTimeSlot"><option value="">Kein Zeitblock</option></select></label>
 <label>Mindestplätze<input name="min_capacity" type="number" min="0" value="0" required></label>
 <label>Maximalplätze<input name="max_capacity" type="number" min="1" value="20" required></label><button id="moduleSave" type="submit">Modul speichern</button><button id="moduleCancelEdit" type="button" class="secondary" hidden>Bearbeitung abbrechen</button></form><div id="moduleList"></div></div>
-<div id="students" class="panel hidden"><h2>Schüler importieren</h2><p>CSV-Spalten: <code>external_id,first_name,last_name,class</code>. Noch keine echten Schülerdaten importieren, bis die Anwendung getestet ist.</p>
-<input id="csv" type="file" accept=".csv,text/csv"><button id="import">CSV importieren</button><p id="studentCount"></p></div><div id="allocation" class="panel hidden"></div></section>
+<div id="students" class="panel hidden"><h2>Schülerdatenbank</h2><p>Schüler und Klassen können bereits vor der Ausschreibung zentral angelegt und per CSV importiert werden. Zugangscodes und Schüler-IDs bleiben bei einer neuen Ausschreibung erhalten.</p>
+<button type="button" id="manageStudentsFromGuide">Zentrale Schülerdatenbank öffnen</button>
+<p id="studentCount"></p><div hidden><input id="csv" type="file" accept=".csv,text/csv"><button id="import" type="button">Alter CSV-Import</button></div></div><div id="allocation" class="panel hidden"></div></section>
 </main><footer>OSZ Rapperswil · Eigenständiges Lernmodul-Tool · <a href="https://schulen-rapperswil.ch/oberstufenzentrum/">Schulhomepage</a></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js" defer></script><script>
@@ -536,6 +545,7 @@ const names=[...new Set(rows.map(r=>r.class))];const {error:ce}=await db.from('c
 const {data:classes,error:le}=await db.from('classes').select('id,name');if(le)return notice(le.message,true);const map=Object.fromEntries(classes.map(c=>[c.name,c.id]));
 const {error}=await db.from('students').upsert(rows.map(r=>({external_id:r.external_id,first_name:r.first_name,last_name:r.last_name,class_id:map[r.class]})),{onConflict:'external_id'});
 notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error){await refresh();window.learningGuideAdvance?.('students');}};
+$('manageStudentsFromGuide').onclick=()=>window.learningOpenStudentDirectory?.();
 catalog();check();
 </script>
 <script src="student-portal.js?v=20261106-privateportal1" defer></script>
@@ -545,5 +555,5 @@ catalog();check();
 <script src="allocation-admin.js?v=20261105-verwaltung" defer></script>
 
 <script src="guided-workflow.js?v=20261106-schueler" defer></script>
-<script src="student-directory.js?v=20261106-schueler2" defer></script>
+<script src="student-directory.js?v=20261106-autoidcsv" defer></script>
 </body></html>
