@@ -27,6 +27,17 @@
 
 Die Datenbankprüfungen wurden mit vollständig zurückgesetzten Testdaten durchgeführt. Die öffentliche Website wurde noch nicht mit einem realen Browser-End-to-End-Test verifiziert.
 
+## Ausschreibungen direkt in der Übersicht sicher löschen
+
+Jede Ausschreibung im Status **Entwurf** oder **Anmeldung offen** hat in der Übersicht rechts einen roten Button **Löschen**. Bei bereits abgeschlossenen oder zugeteilten Ausschreibungen erscheint stattdessen **Geschützt**.
+
+Das Löschen besteht bewusst aus **zwei Schritten**:
+
+1. **Löschung prüfen:** Ein Dialog zeigt den Ausschreibungsnamen, die Anzahl Module und der zugelassenen sowie angemeldeten Schüler. Er weist darauf hin, dass Module, Zeitblöcke und Teilnahmefreigaben mit der Ausschreibung gelöscht werden, jedoch nicht die zentralen Schülerstammdaten oder Zugangscodes.
+2. **Sicherheitsbestätigung:** Der Administrator muss den vollständigen Ausschreibungsnamen exakt eintippen. Erst dann wird die Schaltfläche **Endgültig löschen** aktiv.
+
+Zusätzlich kontrolliert die Supabase-Datenbank **erneut** die Administratorberechtigung, den ausgeschriebenen Namen, den aktuellen Status sowie vorhandene Schüleranmeldungen und Zuteilungen. Sind solche Datensätze vorhanden, wird die Löschung auch bei korrekter Bestätigung verweigert. Jede erfolgreiche Löschung wird im Änderungsprotokoll festgehalten. Der Dialog lässt sich jederzeit abbrechen. Es gibt keine automatische Löschung.
+
 ## Administratorbereich: Ausschreibungen zuerst auswählen
 
 Die bisherige Vierfach-Navigation wurde durch eine schlanke Kopfzeile mit dem Button **Ausschreibungen** ersetzt. Nach dem Login wird zunächst eine Liste aller Ausschreibungen mit **deutschen Statusbezeichnungen** angezeigt:
