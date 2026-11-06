@@ -6,7 +6,7 @@
   const steps=[
     {id:'campaign',title:'Ausschreibung',hint:'Zeitraum, Modulanzahl und Wünsche prüfen oder einen Entwurf bearbeiten.'},
     {id:'modules',title:'Module und Zeitblöcke',hint:'Module erfassen, bearbeiten oder löschen und Zeitblöcke zuordnen.'},
-    {id:'students',title:'Schüler importieren',hint:'Schülerstammdaten verwalten und die CSV-Liste aktualisieren.'},
+    {id:'students',title:'Schülerdatenbank prüfen',hint:'Schüler und Klassen zentral erfassen oder per CSV importieren – auch vor einer neuen Ausschreibung.'},
     {id:'codes',title:'Persönliche Zugangscodes',hint:'Zugangscodes für die Schüler erzeugen oder ersetzen.'},
     {id:'eligibility',title:'Teilnehmende auswählen',hint:'Klassen und einzelne Schüler für diese Ausschreibung zulassen.'},
     {id:'publish',title:'Anmeldung freigeben',hint:'Den Entwurf nach der Kontrolle für Schüler öffnen.'},
