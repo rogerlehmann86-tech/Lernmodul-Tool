@@ -101,6 +101,7 @@
     const elem=detailsMap.get(step);
     if(!elem)return;
     elem.classList.remove('guide-has-error');
+    delete elem.dataset.guideErrorKind;
     const msg=elem.querySelector('.guide-error-summary');
     if(msg){msg.textContent='';msg.hidden=true;}
     elem.querySelectorAll('.guide-invalid-field').forEach(field=>{
@@ -117,6 +118,7 @@
     if(!elem)return;
     clearError(step);
     elem.classList.add('guide-has-error');
+    elem.dataset.guideErrorKind=issues.length?'fields':'step';
     let summary=elem.querySelector('.guide-error-summary');
     if(!summary){
       summary=document.createElement('div');
@@ -195,7 +197,7 @@
   guide.addEventListener('input',event=>{
     const form=event.target.closest('form');
     const step=stepOfForm(form);
-    if(step&&form&&detailsMap.get(step)?.classList.contains('guide-has-error')){
+    if(step&&form&&detailsMap.get(step)?.dataset.guideErrorKind==='fields'){
       // Rot bleibt bestehen, bis auch die übrigen Felder stimmen.
       validateForm(form,{focus:false});
     }
@@ -203,7 +205,7 @@
   guide.addEventListener('change',event=>{
     const form=event.target.closest('form');
     const step=stepOfForm(form);
-    if(step&&form&&detailsMap.get(step)?.classList.contains('guide-has-error'))
+    if(step&&form&&detailsMap.get(step)?.dataset.guideErrorKind==='fields')
       validateForm(form,{focus:false});
   });
   function rememberForm(form){
