@@ -311,7 +311,7 @@ footer{color:var(--muted)}
 <label>Maximalplätze<input name="max_capacity" type="number" min="1" value="20" required></label><button id="moduleSave" type="submit">Modul speichern</button><button id="moduleCancelEdit" type="button" class="secondary" hidden>Bearbeitung abbrechen</button></form><div id="moduleList"></div></div>
 <div id="students" class="panel hidden"><h2>Schülerdatenbank</h2><p>Schüler und Klassen können bereits vor der Ausschreibung zentral angelegt und per CSV importiert werden. Zugangscodes und Schüler-IDs bleiben bei einer neuen Ausschreibung erhalten.</p>
 <button type="button" id="manageStudentsFromGuide">Zentrale Schülerdatenbank öffnen</button>
-<p id="studentCount"></p><div hidden><input id="csv" type="file" accept=".csv,text/csv"><button id="import" type="button">Alter CSV-Import</button></div></div><div id="allocation" class="panel hidden"></div></section>
+<p id="studentCount"></p></div><div id="allocation" class="panel hidden"></div></section>
 </main><footer>OSZ Rapperswil · Eigenständiges Lernmodul-Tool · <a href="https://schulen-rapperswil.ch/oberstufenzentrum/">Schulhomepage</a></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js" defer></script><script>
@@ -539,12 +539,6 @@ const known={id:'external_id',schuler_id:'external_id',schulerid:'external_id',s
 const headers=parsed.shift().map(s=>known[s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_]/g,'_')]||s);
 return parsed.map(values=>Object.fromEntries(headers.map((h,i)=>[h,values[i]??''])));
 }
-$('import').onclick=async()=>{const file=$('csv').files[0];if(!file)return notice('CSV auswählen',true);const rows=parseCSV(await file.text());
-if(!rows.length||rows.some(r=>!r.external_id||!r.first_name||!r.last_name||!r.class))return notice('Benötigt external_id,first_name,last_name,class',true);
-const names=[...new Set(rows.map(r=>r.class))];const {error:ce}=await db.from('classes').upsert(names.map(name=>({name})),{onConflict:'name'});if(ce)return notice(ce.message,true);
-const {data:classes,error:le}=await db.from('classes').select('id,name');if(le)return notice(le.message,true);const map=Object.fromEntries(classes.map(c=>[c.name,c.id]));
-const {error}=await db.from('students').upsert(rows.map(r=>({external_id:r.external_id,first_name:r.first_name,last_name:r.last_name,class_id:map[r.class]})),{onConflict:'external_id'});
-notice(error?.message||rows.length+' Schüler importiert',!!error);if(!error){await refresh();window.learningGuideAdvance?.('students');}};
 $('manageStudentsFromGuide').onclick=()=>window.learningOpenStudentDirectory?.();
 catalog();check();
 </script>
@@ -554,6 +548,6 @@ catalog();check();
 <script src="registration-admin.js?v=20261105-verwaltung" defer></script>
 <script src="allocation-admin.js?v=20261105-verwaltung" defer></script>
 
-<script src="guided-workflow.js?v=20261106-schueler" defer></script>
+<script src="guided-workflow.js?v=20261106-autoidcsv" defer></script>
 <script src="student-directory.js?v=20261106-autoidcsv" defer></script>
 </body></html>
